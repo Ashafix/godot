@@ -2556,7 +2556,7 @@ void EditorNode::set_addon_plugin_enabled(const String &p_addon, bool p_enabled)
 		show_warning(vformat(TTR("Unable to load addon script from path: '%s' There seems to be an error in the code, please check the syntax."), path));
 		return;
 	}
-	
+
 	//could check inheritance..
 	if (String(script->get_instance_base_type()) != "EditorPlugin") {
 		show_warning(vformat(TTR("Unable to load addon script from path: '%s' Base type is not EditorPlugin."), path));
