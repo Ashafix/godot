@@ -6,13 +6,32 @@
 	<description>
 		A simplified interface to a scene file. Provides access to operations and checks that can be performed on the scene resource itself.
 		Can be used to save a node to a file. When saving, the node as well as all the node it owns get saved (see [code]owner[/code] property on [Node]). Note that the node doesn't need to own itself.
-		Example of saving a node:
+
+		[b]Example of saving a node with different owners[/b]
+
+		The following example creates 3 objects: ``Node2D`` (`node`), ``RigidBody2D`` (`rigid`) and ``CollisionObject2D`` (`collision`). `collision` is a child of `rigid` which is a child of `node`. Only `rigid` is owned by `node` and ``pack`` will therefore only save those two nodes, but not `collision`.
+
+
 		[codeblock]
+		# create the objects
+		var node = Node2D.new()
+		var rigid = RigidBody2D.new()
+		var collision = CollisionShape2D.new()
+
+		# create the object hierachy
+		rigid.add_child(collision)
+		node.add_child(rigid)
+
+		# change owner of rigid, but not of collision
+		rigid.set_owner(node)
+
 		var scene = PackedScene.new()
-		var result = scene.pack(child)
+		# only node and rigid are now packed
+		var result = scene.pack(node)
 		if result == OK:
 		    ResourceSaver.save("res://path/name.scn", scene) # or user://...
 		[/codeblock]
+	</description>	
 	</description>
 	<tutorials>
 	</tutorials>
