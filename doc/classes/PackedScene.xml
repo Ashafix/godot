@@ -31,7 +31,6 @@
 		if result == OK:
 		    ResourceSaver.save("res://path/name.scn", scene) # or user://...
 		[/codeblock]
-	</description>	
 	</description>
 	<tutorials>
 	</tutorials>
