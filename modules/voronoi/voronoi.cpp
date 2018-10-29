@@ -102,11 +102,10 @@ void Voronoi::voronoi2d_in_box(Array bounding_points, int n_points) {
 	//assign the random points to the vector
 	std::vector<double> all_points(n_points * n_dim * (2 * n_dim + 1));
 	std::copy_n(r_points.begin(), n_points * n_dim, all_points.begin());
-	
+
 	//adjust/mirror the points
 	std::vector<double> offset = std::vector<double>();
 	std::vector<int> prefix = std::vector<int>();
-	
 
 	//TODO move to lower loop
 	for (int i = 0; i < n_dim; ++i) {
@@ -140,7 +139,7 @@ void Voronoi::voronoi2d_in_box(Array bounding_points, int n_points) {
 	qhull.runQhull(rbox, "v Qbb");
 	qhull.outputQhull("p");
 	qhull.outputQhull("FN");
-	
+
 	if (n_dim == 2) {
 		std::string qhull_output = output.str();
 		Voronoi::parse_output2d(output, val_min[0], val_max[0], val_min[1], val_max[1]);
@@ -203,7 +202,6 @@ void Voronoi::voronoi3d_in_box(PoolVector3Array bounding_points, int n_points) {
 			all_points[i * dim + d] = points[i + d];
 		}
 	}
-	
 
 	//adjust/mirror the points
 	//TODO put it in an elegant loop
@@ -298,7 +296,6 @@ void Voronoi::parse_output2d(std::stringstream &output, const double &min_x, con
 			}
 		}
 		line_counter++;
-		
 	}
 
 	faces = Array();
@@ -374,7 +371,6 @@ void Voronoi::parse_output3d(std::stringstream &output, const double &min_x, con
 		}
 		line_counter++;
 	}
-
 
 	faces = Array();
 	fragments = Array();
