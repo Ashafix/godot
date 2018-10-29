@@ -117,30 +117,13 @@ void Voronoi::voronoi2d_in_box(Array bounding_points, int n_points) {
 		}
 	}
 
+	//fancy loop which just mirrors the values in all dimensions
 	for (int n = 0; n < n_dim * n_dim * 2; ++n) {
 		for (int i = 0; i < n_points; ++i) {
 			all_points[n_dim * n_points * (n / n_dim + 1) + i * n_dim + n % n_dim] = offset[n] + prefix[n] * all_points[i * n_dim + n % n_dim];
 		}
 	}
 
-	/*
-	//TODO put it in an elegant loop
-	for (int i = 0; i < n_points; ++i) {
-
-		//left mirror
-		all_points[2 * n_points * 1 + i * n_dim] = 2 * val_min[0] - all_points[i * 2];
-		all_points[2 * n_points * 1 + i * n_dim + 1] = all_points[i * 2 + 1];
-		//right mirror
-		all_points[2 * n_points * 2 + i * n_dim] = 2 * val_max[0] - all_points[i * 2];
-		all_points[2 * n_points * 2 + i * n_dim + 1] = all_points[i * 2 + 1];
-		//top mirror
-		all_points[2 * n_points * 3 + i * n_dim] = all_points[i * 2];
-		all_points[2 * n_points * 3 + i * n_dim + 1] = 2 * val_min[1] - all_points[i * 2 + 1];
-		//bottom mirror
-		all_points[2 * n_points * 4 + i * n_dim] = all_points[i * 2];
-		all_points[2 * n_points * 4 + i * n_dim + 1] = 2 * val_max[1] - all_points[i * 2 + 1];
-	}
-	*/
 	orgQhull::RboxPoints rbox;
 
 	std::stringstream stringStream;
@@ -167,8 +150,7 @@ void Voronoi::voronoi2d_in_box(Array bounding_points, int n_points) {
 	}
 }
 
-void Voronoi
-::voronoi3d(int n_points) {
+void Voronoi::voronoi3d(int n_points) {
 	PoolVector3Array bounding_points = PoolVector3Array();
 	bounding_points.append(Vector3(0, 0, 0));
 	bounding_points.append(Vector3(1, 0, 0));
@@ -184,11 +166,6 @@ void Voronoi
 void Voronoi::voronoi3d_in_box(PoolVector3Array bounding_points, int n_points) {
 
 	int precision = std::numeric_limits<double>::digits10 + 1;
-	std::ofstream myfile;
-	myfile.open("perf.txt");
-
-	auto time_start = std::chrono::system_clock::now();
-
 	int dim = 3;
 	int size = bounding_points.size();
 
@@ -217,10 +194,6 @@ void Voronoi::voronoi3d_in_box(PoolVector3Array bounding_points, int n_points) {
 			min_z = bounding_points[i].z;
 		}
 	}
-	auto time_init = std::chrono::system_clock::now();
-	std::chrono::duration<double> diff = time_init - time_start;
-	myfile << diff.count() << "\n";
-	time_init = std::chrono::system_clock::now();
 
 	//create some random points inside the bounding box
 	std::vector<double> points = generate_random_points3d(n_points, min_x, max_x, min_y, max_y, min_z, max_z);
@@ -231,10 +204,7 @@ void Voronoi::voronoi3d_in_box(PoolVector3Array bounding_points, int n_points) {
 			all_points[i * dim + d] = points[i + d];
 		}
 	}
-	auto time_random = std::chrono::system_clock::now();
-	diff = time_random - time_init;
-	myfile << diff.count() << "\n";
-	time_random = std::chrono::system_clock::now();
+	
 
 	//adjust/mirror the points
 	//TODO put it in an elegant loop
@@ -264,7 +234,6 @@ void Voronoi::voronoi3d_in_box(PoolVector3Array bounding_points, int n_points) {
 		all_points[3 * n_points * 6 + i * 3 + 1] = all_points[i * 3 + 1];
 		all_points[3 * n_points * 6 + i * 3 + 2] = 2 * max_z - all_points[i * 3 + 2];
 	}
-	auto time_mirror = std::chrono::system_clock::now();
 
 	orgQhull::RboxPoints rbox;
 
@@ -282,7 +251,6 @@ void Voronoi::voronoi3d_in_box(PoolVector3Array bounding_points, int n_points) {
 	qhull.setOutputStream(&output);
 	qhull.runQhull(rbox, "v Qbb");
 	qhull.outputQhull("o");
-	auto time_qhull = std::chrono::system_clock::now();
 
 	Voronoi::parse_output3d(output, min_x, max_x, min_y, max_y, min_z, max_z);
 }
@@ -334,7 +302,6 @@ void Voronoi::parse_output2d(std::stringstream &output, const double &min_x, con
 		
 	}
 
-
 	faces = Array();
 
 	for (int i = 0; i < vectfaces.size(); ++i) {
@@ -357,11 +324,6 @@ void Voronoi::parse_output2d(std::stringstream &output, const double &min_x, con
 
 void Voronoi::parse_output3d(std::stringstream &output, const double &min_x, const double &max_x, const double &min_y, const double &max_y, const double &min_z, const double &max_z) {
 
-	std::ofstream myfile;
-	myfile.open("perf_parse.txt");
-
-	auto time_start = std::chrono::system_clock::now();
-
 	std::vector<bool> good_vertexes;
 	std::vector<std::vector<int> > vectfaces;
 
@@ -374,11 +336,6 @@ void Voronoi::parse_output3d(std::stringstream &output, const double &min_x, con
 
 	std::vector<std::vector<double> > voro_vertexes = std::vector<std::vector<double> >();
 	output.seekg(0);
-
-	auto time_init = std::chrono::system_clock::now();
-	std::chrono::duration<double> diff = time_start - time_init;
-	myfile << "init to start: " << diff.count() << "\n";
-	time_init = std::chrono::system_clock::now();
 
 	for (std::string line; std::getline(output, line);) {
 		std::string::size_type sz;
@@ -419,22 +376,11 @@ void Voronoi::parse_output3d(std::stringstream &output, const double &min_x, con
 		line_counter++;
 	}
 
-	auto time_parse = std::chrono::system_clock::now();
-	diff = time_parse - time_init;
-	myfile << "start to parse: ";
-	myfile << diff.count();
-	myfile << "\n";
 
 	faces = Array();
 	fragments = Array();
 
-	std::chrono::duration<double> diff_c = std::chrono::duration<double>::zero();
-	std::chrono::duration<double> diff_qhull = std::chrono::duration<double>::zero();
-	std::chrono::duration<double> diff_godot = std::chrono::duration<double>::zero();
-	auto time0 = std::chrono::system_clock::now();
-
 	for (int i = 0; i < vectfaces.size(); ++i) {
-		time0 = std::chrono::system_clock::now();
 		bool good_face = True;
 		for (int j = 0; j < vectfaces[i].size(); ++j) {
 			if (!good_vertexes[std::abs(vectfaces[i][j])]) {
@@ -442,11 +388,7 @@ void Voronoi::parse_output3d(std::stringstream &output, const double &min_x, con
 				break;
 			}
 		}
-		diff_c += (std::chrono::system_clock::now() - time0);
 		if (good_face && vectfaces[i].size() > 0) {
-
-			time0 = std::chrono::system_clock::now();
-
 			std::stringstream output_hull;
 			std::stringstream stringStream;
 			orgQhull::RboxPoints rbox;
@@ -469,12 +411,9 @@ void Voronoi::parse_output3d(std::stringstream &output, const double &min_x, con
 			qhull.runQhull(rbox, "i Qt");
 			qhull.outputQhull();
 
-			diff_qhull += (std::chrono::system_clock::now() - time0);
-
 			Array godot_triangles = Array();
 			bool first_line = true;
 			output_hull.seekg(0);
-			time0 = std::chrono::system_clock::now();
 			for (std::string line; std::getline(output_hull, line);) {
 				if (first_line) {
 					first_line = false;
@@ -495,19 +434,8 @@ void Voronoi::parse_output3d(std::stringstream &output, const double &min_x, con
 				}
 			}
 			fragments.append(godot_triangles);
-			diff_godot += (std::chrono::system_clock::now() - time0);
 		}
 	}
-
-	auto time_qhull = std::chrono::system_clock::now();
-
-	diff = time_parse - time_qhull;
-	myfile << "Parse to qhull: " << diff.count() << "\n";
-	myfile << "diff_c: " << diff_c.count() << "\n";
-	myfile << "diff_godot: " << diff_godot.count() << "\n";
-	myfile << "diff_qhull: " << diff_qhull.count() << "\n";
-
-	myfile.close();
 }
 
 Dictionary Voronoi::get_vertexes() {
