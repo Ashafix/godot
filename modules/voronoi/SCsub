@@ -12,12 +12,6 @@ for direc in dirs:
 		if file.endswith('.cpp') or file.endswith('.c'):
 			src_list.append(direc + file)
 
-remove = ('libqhull_r/userprintf_r.c', 'libqhull_r/userprintf_rbox_r.c')
-
-for remo in remove:
-	if remo in src_list:
-		src_list.pop(src_list.index(remo))
-print(src_list)
 env.add_source_files(env.modules_sources, src_list)
 
 
