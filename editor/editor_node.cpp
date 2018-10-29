@@ -3898,7 +3898,9 @@ void EditorNode::_scene_tab_hover(int p_tab) {
 		tab_preview_panel->hide();
 	} else {
 		String path = editor_data.get_scene_path(p_tab);
-		EditorResourcePreview::get_singleton()->queue_resource_preview(path, this, "_thumbnail_done", p_tab);
+		if (path != String()) {
+			EditorResourcePreview::get_singleton()->queue_resource_preview(path, this, "_thumbnail_done", p_tab);
+		}
 	}
 }
 
@@ -4737,6 +4739,8 @@ EditorNode::EditorNode() {
 	ResourceLoader::set_timestamp_on_load(true);
 	ResourceSaver::set_timestamp_on_save(true);
 
+    default_value_cache = memnew( EditorDefaultClassValueCache );
+
 	{ //register importers at the beginning, so dialogs are created with the right extensions
 		Ref<ResourceImporterTexture> import_texture;
 		import_texture.instance();
@@ -4987,7 +4991,7 @@ EditorNode::EditorNode() {
 	dock_select_rect_over = -1;
 	dock_popup_selected = -1;
 	for (int i = 0; i < DOCK_SLOT_MAX; i++) {
-		dock_slot[i]->set_custom_minimum_size(Size2(230, 220) * EDSCALE);
+		dock_slot[i]->set_custom_minimum_size(Size2(170, 0) * EDSCALE);
 		dock_slot[i]->set_v_size_flags(Control::SIZE_EXPAND_FILL);
 		dock_slot[i]->set_popup(dock_select_popup);
 		dock_slot[i]->connect("pre_popup_pressed", this, "_dock_pre_popup", varray(i));
@@ -5503,8 +5507,8 @@ EditorNode::EditorNode() {
 	right_r_vsplit->hide();
 
 	// Add some offsets to left_r and main hsplits to make LEFT_R and RIGHT_L docks wider than minsize
-	left_r_hsplit->set_split_offset(40 * EDSCALE);
-	main_hsplit->set_split_offset(-40 * EDSCALE);
+	left_r_hsplit->set_split_offset(70 * EDSCALE);
+	main_hsplit->set_split_offset(-70 * EDSCALE);
 
 	// Define corresponding default layout
 
@@ -5519,8 +5523,8 @@ EditorNode::EditorNode() {
 	for (int i = 0; i < vsplits.size(); i++)
 		default_layout->set_value(docks_section, "dock_split_" + itos(i + 1), 0);
 	default_layout->set_value(docks_section, "dock_hsplit_1", 0);
-	default_layout->set_value(docks_section, "dock_hsplit_2", 40 * EDSCALE);
-	default_layout->set_value(docks_section, "dock_hsplit_3", -40 * EDSCALE);
+	default_layout->set_value(docks_section, "dock_hsplit_2", 70 * EDSCALE);
+	default_layout->set_value(docks_section, "dock_hsplit_3", -70 * EDSCALE);
 	default_layout->set_value(docks_section, "dock_hsplit_4", 0);
 
 	_update_layouts_menu();
@@ -5861,6 +5865,7 @@ EditorNode::~EditorNode() {
 	memdelete(editor_plugins_force_input_forwarding);
 	memdelete(file_server);
 	memdelete(progress_hb);
+    memdelete(default_value_cache);
 	EditorSettings::destroy();
 }
 
