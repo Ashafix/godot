@@ -24,22 +24,6 @@
 #include <stdlib.h>
 
 /*-<a                             href="qh-user_r.htm#TOC"
-  >-------------------------------</a><a name="qh_exit">-</a>
-
-  qh_exit( exitcode )
-    exit program
-
-  notes:
-    qh_exit() is called when qh_errexit() and longjmp() are not available.
-
-    This is the only use of exit() in Qhull
-    To replace qh_exit with 'throw', see libqhullcpp/usermem_r-cpp.cpp
-*/
-void qh_exit(int exitcode) {
-    exit(exitcode);
-} /* exit */
-
-/*-<a                             href="qh-user_r.htm#TOC"
   >-------------------------------</a><a name="qh_fprintf_stderr">-</a>
 
   qh_fprintf_stderr( msgcode, format, list of args )

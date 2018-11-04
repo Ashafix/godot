@@ -12,8 +12,8 @@ for direc in dirs:
 		if file.endswith('.cpp') or file.endswith('.c'):
 			src_list.append(direc + file)
 
-env.add_source_files(env.modules_sources, src_list)
 module_env = env.Clone()
+module_env.add_source_files(env.modules_sources, src_list)
 module_env.Append(CXXFLAGS=['-std=c++11'])
 
 
