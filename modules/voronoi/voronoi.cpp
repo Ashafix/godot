@@ -268,16 +268,16 @@ void Voronoi::parse_output2d(std::stringstream &output, const double &min_x, con
 	output.seekg(0);
 	for (std::string line; std::getline(output, line);) {
 		if (line_counter == 1) {
-			n_points = atoi(line);
+			n_points = atoi(line.c_str());
 			good_vertexes.reserve(n_points);
 		} else if (line_counter == n_points + 2) {
-			n_faces = atoi(line);
+			n_faces = atoi(line.c_str());
 			vectfaces = std::vector<std::vector<int> >(n_faces);
 		} else if (line_counter > 1 && line_counter < n_points + 2) {
 			int space_pos = line.find(' ');
 
-			double x = atof(line.substr(0, space_pos);
-			double y = atof(line.substr(space_pos));
+			double x = atof(line.substr(0, space_pos).c_str());
+			double y = atof(line.substr(space_pos).c_str());
 			good_vertex = (x >= min_x - epsilon && x <= max_x + epsilon && y >= min_y - epsilon && y <= max_y + epsilon);
 			good_vertexes.push_back(good_vertex);
 			if (good_vertex) {
