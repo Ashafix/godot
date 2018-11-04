@@ -91,7 +91,6 @@ void Voronoi::voronoi2d_in_box(Array bounding_points, int n_points) {
 
 	int precision = std::numeric_limits<double>::digits10 + 1;
 	int n_dim = 2;
-	int size = bounding_points.size();
 
 	std::vector<double> val_min;
 	std::vector<double> val_max;

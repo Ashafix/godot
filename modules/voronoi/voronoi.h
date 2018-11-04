@@ -19,11 +19,11 @@ class Voronoi : public Reference
 		static void _bind_methods();
 		void parse_output2d(std::stringstream &output, const double &min_x, const double &max_x, const double &min_y, const double &max_y);
 		void parse_output3d(std::stringstream &output, const double &min_x, const double &max_x, const double &min_y, const double &max_y, const double &min_z, const double &max_z);
-		std::vector<double> Voronoi::generate_random_points(const int n_points, const int n_dim, std::vector<double> val_min, std::vector<double> val_max);
+		std::vector<double> generate_random_points(const int n_points, const int n_dim, std::vector<double> val_min, std::vector<double> val_max);
 		std::vector<double> generate_random_points2d(int n_points, double min_x, double max_x, double min_y, double max_y);
 		std::vector<double> generate_random_points3d(int n_points, const double min_x, const double max_x, const double min_y, const double max_y, const double min_z, const
 			double max_z);
-		void Voronoi::get_boundaries(Array const &bounding_points, int const &n_dim, std::vector<double> &val_min, std::vector<double> &val_max);
+		void get_boundaries(Array const &bounding_points, int const &n_dim, std::vector<double> &val_min, std::vector<double> &val_max);
 		
 		bool manual_seed = false;
 		double seed = seed;
