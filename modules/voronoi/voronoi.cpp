@@ -102,10 +102,11 @@ void Voronoi::voronoi2d_in_box(Array bounding_points, int n_points) {
 	//assign the random points to the vector
 	std::vector<double> all_points(n_points * n_dim * (2 * n_dim + 1));
 	std::copy_n(r_points.begin(), n_points * n_dim, all_points.begin());
-
+	
 	//adjust/mirror the points
 	std::vector<double> offset = std::vector<double>();
 	std::vector<int> prefix = std::vector<int>();
+	
 
 	//TODO move to lower loop
 	for (int i = 0; i < n_dim; ++i) {
@@ -139,7 +140,7 @@ void Voronoi::voronoi2d_in_box(Array bounding_points, int n_points) {
 	qhull.runQhull(rbox, "v Qbb");
 	qhull.outputQhull("p");
 	qhull.outputQhull("FN");
-
+	
 	if (n_dim == 2) {
 		std::string qhull_output = output.str();
 		Voronoi::parse_output2d(output, val_min[0], val_max[0], val_min[1], val_max[1]);
@@ -202,6 +203,7 @@ void Voronoi::voronoi3d_in_box(PoolVector3Array bounding_points, int n_points) {
 			all_points[i * dim + d] = points[i + d];
 		}
 	}
+	
 
 	//adjust/mirror the points
 	//TODO put it in an elegant loop
@@ -282,21 +284,23 @@ void Voronoi::parse_output2d(std::stringstream &output, const double &min_x, con
 				vertexes[line_counter - 2] = Vector2(x, y);
 			}
 		} else if (line_counter > (n_points + 1)) {
-			std::string::size_type sz;
-			std::string::size_type pos = 0;
+			int pos = 0;
+			int offset = 0;
 			int vect_index = line_counter - 3 - n_points;
-			while (pos < line.length() - 1) {
-				int value = std::stoi(line.substr(pos), &sz);
+			while (pos > -1) {
+				pos = line.substr(offset).find(' ');
+				int value = atoi(line.substr(offset, pos).c_str());
 
 				if (pos == 0) {
 					vectfaces[vect_index] = std::vector<int>();
 				} else {
 					vectfaces[vect_index].push_back(value);
 				}
-				pos += sz;
+				offset += pos + 1;
 			}
 		}
 		line_counter++;
+		
 	}
 
 	faces = Array();
@@ -335,20 +339,23 @@ void Voronoi::parse_output3d(std::stringstream &output, const double &min_x, con
 	output.seekg(0);
 
 	for (std::string line; std::getline(output, line);) {
-		std::string::size_type sz;
 		std::string::size_type pos = 0;
 		if (line_counter == 1) {
-			n_points = std::stoi(line, &sz);
-			pos += sz;
-			n_faces = std::stoi(line.substr(pos));
+			pos = line.find(' ');
+			n_points = atoi(line.substr(0, pos).c_str());
+			n_faces = atoi(line.substr(pos + 1).c_str());
 			vectfaces = std::vector<std::vector<int> >(n_faces);
 
 		} else if (line_counter > 1 && line_counter < n_points + 2) {
-			double x = std::stod(line, &sz);
-			pos += sz;
-			double y = std::stod(line.substr(pos), &sz);
-			pos += sz;
-			double z = std::stod(line.substr(pos), &sz);
+			pos = line.find(' ');
+			int offset = 0;
+			double x = atof(line.substr(0, pos).c_str());
+			offset += pos + 1;
+			pos = line.substr(offset).find(' ');
+			double y = atof(line.substr(offset, pos).c_str());
+			offset += pos + 1;
+			pos = line.substr(offset).find(' ');
+			double z = atof(line.substr(offset, pos).c_str());
 			good_vertex = (x >= min_x - epsilon && x <= max_x + epsilon && y >= min_y - epsilon && y <= max_y + epsilon && z >= min_z - epsilon && z <= max_z + epsilon);
 			good_vertexes.push_back(good_vertex);
 			if (good_vertex) {
@@ -359,19 +366,24 @@ void Voronoi::parse_output3d(std::stringstream &output, const double &min_x, con
 		} else if (line_counter >= (n_points + 2)) {
 			int counter = -1;
 			int vect_index = line_counter - 2 - n_points;
-			while (pos < line.size() - 1) {
-				int value = std::stoi(line.substr(pos), &sz);
-				if (pos == 0) {
+			int offset = 0;
+			int pos = 0;
+			while (pos > -1) {
+				pos = line.substr(offset).find(' ');
+				int value = atoi(line.substr(offset, pos).c_str());
+				
+				if (offset == 0) {
 					vectfaces[vect_index] = std::vector<int>();
 				} else {
 					vectfaces[vect_index].push_back(value);
 				}
-				pos += sz;
+				offset += pos + 1;
 			}
 			counter++;
 		}
 		line_counter++;
 	}
+
 
 	faces = Array();
 	fragments = Array();
@@ -414,13 +426,16 @@ void Voronoi::parse_output3d(std::stringstream &output, const double &min_x, con
 				if (first_line) {
 					first_line = false;
 				} else {
-					std::string::size_type sz;
+					std::string::size_type offset = 0;
 					std::string::size_type pos = 0;
-					int a = std::stoi(line, &sz);
-					pos += sz;
-					int b = std::stoi(line.substr(pos), &sz);
-					pos += sz;
-					int c = std::stoi(line.substr(pos), &sz);
+					pos = line.find(' ');	
+					int a = atoi(line.substr(offset, pos).c_str());
+					offset += pos + 1;
+					pos = line.substr(offset).find(' ');	
+					int b = atoi(line.substr(offset, pos).c_str());
+					offset += pos + 1;
+					pos = line.substr(offset).find(' ');	
+					int c = atoi(line.substr(offset, pos).c_str());
 
 					Array p = Array();
 					p.append(Vector3(voro_vertexes[vectfaces[i][a]][0], voro_vertexes[vectfaces[i][a]][1], voro_vertexes[vectfaces[i][a]][2]));
