@@ -413,7 +413,8 @@ void Voronoi::parse_output3d(std::stringstream &output, const double &min_x, con
 			}
 			faces.append(cur_face);
 
-			rbox.appendPoints(std::istringstream(stringStream.str()));
+			std::istringstream iStringStream = std::istringstream(stringStream.str());
+			rbox.appendPoints(iStringStream);
 
 			qhull.runQhull(rbox, "i Qt");
 			qhull.outputQhull();
