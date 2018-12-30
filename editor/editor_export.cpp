@@ -222,11 +222,10 @@ String EditorExportPreset::get_custom_features() const {
 	return custom_features;
 }
 
-EditorExportPreset::EditorExportPreset() {
-
-	export_path = "";
-	export_filter = EXPORT_ALL_RESOURCES;
-	runnable = false;
+EditorExportPreset::EditorExportPreset() :
+		export_filter(EXPORT_ALL_RESOURCES),
+		export_path(""),
+		runnable(false) {
 }
 
 ///////////////////////////////////
@@ -546,6 +545,13 @@ void EditorExportPlugin::_export_begin_script(const PoolVector<String> &p_featur
 	}
 }
 
+void EditorExportPlugin::_export_end_script() {
+
+	if (get_script_instance()) {
+		get_script_instance()->call("_export_end");
+	}
+}
+
 void EditorExportPlugin::_export_file(const String &p_path, const String &p_type, const Set<String> &p_features) {
 }
 
@@ -587,6 +593,20 @@ EditorExportPlatform::FeatureContainers EditorExportPlatform::get_feature_contai
 		result.features.insert(E->get());
 		result.features_pv.push_back(E->get());
 	}
+
+	if (p_preset->get_custom_features() != String()) {
+
+		Vector<String> tmp_custom_list = p_preset->get_custom_features().split(",");
+
+		for (int i = 0; i < tmp_custom_list.size(); i++) {
+			String f = tmp_custom_list[i].strip_edges();
+			if (f != String()) {
+				result.features.insert(f);
+				result.features_pv.push_back(f);
+			}
+		}
+	}
+
 	return result;
 }
 
@@ -606,6 +626,9 @@ EditorExportPlatform::ExportNotifier::ExportNotifier(EditorExportPlatform &p_pla
 EditorExportPlatform::ExportNotifier::~ExportNotifier() {
 	Vector<Ref<EditorExportPlugin> > export_plugins = EditorExport::get_singleton()->get_export_plugins();
 	for (int i = 0; i < export_plugins.size(); i++) {
+		if (export_plugins[i]->get_script_instance()) {
+			export_plugins.write[i]->_export_end_script();
+		}
 		export_plugins.write[i]->_export_end();
 	}
 }
@@ -1351,18 +1374,21 @@ bool EditorExportPlatformPC::can_export(const Ref<EditorExportPreset> &p_preset,
 	return valid;
 }
 
-String EditorExportPlatformPC::get_binary_extension(const Ref<EditorExportPreset> &p_preset) const {
+List<String> EditorExportPlatformPC::get_binary_extensions(const Ref<EditorExportPreset> &p_preset) const {
+	List<String> list;
 	for (Map<String, String>::Element *E = extensions.front(); E; E = E->next()) {
 		if (p_preset->get(E->key())) {
-			return extensions[E->key()];
+			list.push_back(extensions[E->key()]);
+			return list;
 		}
 	}
 
 	if (extensions.has("default")) {
-		return extensions["default"];
+		list.push_back(extensions["default"]);
+		return list;
 	}
 
-	return "";
+	return list;
 }
 
 Error EditorExportPlatformPC::export_project(const Ref<EditorExportPreset> &p_preset, bool p_debug, const String &p_path, int p_flags) {

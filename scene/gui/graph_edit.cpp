@@ -1277,7 +1277,7 @@ void GraphEdit::_bind_methods() {
 
 	ADD_SIGNAL(MethodInfo("connection_request", PropertyInfo(Variant::STRING, "from"), PropertyInfo(Variant::INT, "from_slot"), PropertyInfo(Variant::STRING, "to"), PropertyInfo(Variant::INT, "to_slot")));
 	ADD_SIGNAL(MethodInfo("disconnection_request", PropertyInfo(Variant::STRING, "from"), PropertyInfo(Variant::INT, "from_slot"), PropertyInfo(Variant::STRING, "to"), PropertyInfo(Variant::INT, "to_slot")));
-	ADD_SIGNAL(MethodInfo("popup_request", PropertyInfo(Variant::VECTOR2, "p_position")));
+	ADD_SIGNAL(MethodInfo("popup_request", PropertyInfo(Variant::VECTOR2, "position")));
 	ADD_SIGNAL(MethodInfo("duplicate_nodes_request"));
 	ADD_SIGNAL(MethodInfo("node_selected", PropertyInfo(Variant::OBJECT, "node", PROPERTY_HINT_RESOURCE_TYPE, "Node")));
 	ADD_SIGNAL(MethodInfo("connection_to_empty", PropertyInfo(Variant::STRING, "from"), PropertyInfo(Variant::INT, "from_slot"), PropertyInfo(Variant::VECTOR2, "release_position")));
@@ -1339,21 +1339,25 @@ GraphEdit::GraphEdit() {
 
 	zoom_minus = memnew(ToolButton);
 	zoom_hb->add_child(zoom_minus);
+	zoom_minus->set_tooltip(RTR("Zoom Out"));
 	zoom_minus->connect("pressed", this, "_zoom_minus");
 	zoom_minus->set_focus_mode(FOCUS_NONE);
 
 	zoom_reset = memnew(ToolButton);
 	zoom_hb->add_child(zoom_reset);
+	zoom_reset->set_tooltip(RTR("Zoom Reset"));
 	zoom_reset->connect("pressed", this, "_zoom_reset");
 	zoom_reset->set_focus_mode(FOCUS_NONE);
 
 	zoom_plus = memnew(ToolButton);
 	zoom_hb->add_child(zoom_plus);
+	zoom_plus->set_tooltip(RTR("Zoom In"));
 	zoom_plus->connect("pressed", this, "_zoom_plus");
 	zoom_plus->set_focus_mode(FOCUS_NONE);
 
 	snap_button = memnew(ToolButton);
 	snap_button->set_toggle_mode(true);
+	snap_button->set_tooltip(RTR("Enable snap and show grid."));
 	snap_button->connect("pressed", this, "_snap_toggled");
 	snap_button->set_pressed(true);
 	snap_button->set_focus_mode(FOCUS_NONE);

@@ -58,10 +58,12 @@
 #define _EXT_DEBUG_SEVERITY_LOW_ARB 0x9148
 #define _EXT_DEBUG_OUTPUT 0x92E0
 
-#if (defined WINDOWS_ENABLED) && !(defined UWP_ENABLED)
+#ifndef GLAPIENTRY
+#if defined(WINDOWS_ENABLED) && !defined(UWP_ENABLED)
 #define GLAPIENTRY APIENTRY
 #else
 #define GLAPIENTRY
+#endif
 #endif
 
 #if !defined(GLES_OVER_GL) && !defined(IPHONE_ENABLED)
@@ -395,7 +397,6 @@ void RasterizerGLES2::blit_render_target_to_screen(RID p_render_target, const Re
 	ERR_FAIL_COND(!rt);
 
 	canvas->state.canvas_shader.set_conditional(CanvasShaderGLES2::USE_TEXTURE_RECT, true);
-	canvas->state.canvas_shader.set_conditional(CanvasShaderGLES2::USE_UV_ATTRIBUTE, false);
 
 	canvas->state.canvas_shader.set_custom_shader(0);
 	canvas->state.canvas_shader.bind();

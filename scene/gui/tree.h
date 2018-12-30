@@ -434,6 +434,7 @@ private:
 		int button_margin;
 		Point2 offset;
 		int draw_relationship_lines;
+		int draw_guides;
 		int scroll_border;
 		int scroll_speed;
 
@@ -455,6 +456,8 @@ private:
 
 		TreeItem *hover_item;
 		int hover_cell;
+
+		Point2i text_editor_position;
 
 	} cache;
 

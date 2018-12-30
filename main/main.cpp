@@ -722,6 +722,29 @@ Error Main::setup(const char *execpath, int argc, char *argv[], bool p_second_ph
 		I = N;
 	}
 
+	// Network file system needs to be configured before globals, since globals are based on the
+	// 'project.godot' file which will only be available through the network if this is enabled
+	FileAccessNetwork::configure();
+	if (remotefs != "") {
+
+		file_access_network_client = memnew(FileAccessNetworkClient);
+		int port;
+		if (remotefs.find(":") != -1) {
+			port = remotefs.get_slicec(':', 1).to_int();
+			remotefs = remotefs.get_slicec(':', 0);
+		} else {
+			port = 6010;
+		}
+
+		Error err = file_access_network_client->connect(remotefs, port, remotefs_pass);
+		if (err) {
+			OS::get_singleton()->printerr("Could not connect to remotefs: %s:%i.\n", remotefs.utf8().get_data(), port);
+			goto error;
+		}
+
+		FileAccess::make_default<FileAccessNetwork>(FileAccess::ACCESS_RESOURCES);
+	}
+
 	if (globals->setup(project_path, main_pack, upwards) == OK) {
 		found_project = true;
 	} else {
@@ -767,28 +790,6 @@ Error Main::setup(const char *execpath, int argc, char *argv[], bool p_second_ph
 
 		script_debugger = memnew(ScriptDebuggerLocal);
 		OS::get_singleton()->initialize_debugging();
-	}
-
-	FileAccessNetwork::configure();
-
-	if (remotefs != "") {
-
-		file_access_network_client = memnew(FileAccessNetworkClient);
-		int port;
-		if (remotefs.find(":") != -1) {
-			port = remotefs.get_slicec(':', 1).to_int();
-			remotefs = remotefs.get_slicec(':', 0);
-		} else {
-			port = 6010;
-		}
-
-		Error err = file_access_network_client->connect(remotefs, port, remotefs_pass);
-		if (err) {
-			OS::get_singleton()->printerr("Could not connect to remotefs: %s:%i.\n", remotefs.utf8().get_data(), port);
-			goto error;
-		}
-
-		FileAccess::make_default<FileAccessNetwork>(FileAccess::ACCESS_RESOURCES);
 	}
 	if (script_debugger) {
 		//there is a debugger, parse breakpoints
@@ -1028,8 +1029,6 @@ Error Main::setup(const char *execpath, int argc, char *argv[], bool p_second_ph
 
 	message_queue = memnew(MessageQueue);
 
-	ProjectSettings::get_singleton()->register_global_defaults();
-
 	if (p_second_phase)
 		return setup2();
 
@@ -1229,6 +1228,7 @@ Error Main::setup2(Thread::ID p_main_tid_override) {
 
 	register_driver_types();
 
+	// This loads global classes, so it must happen before custom loaders and savers are registered
 	ScriptServer::init_languages();
 
 	MAIN_PRINT("Main: Load Translations");
@@ -1488,6 +1488,9 @@ bool Main::start() {
 		}
 #endif
 
+		ResourceLoader::add_custom_loaders();
+		ResourceSaver::add_custom_savers();
+
 		if (!project_manager && !editor) { // game
 			if (game_path != "" || script != "") {
 				//autoload
@@ -1696,12 +1699,17 @@ bool Main::start() {
 #ifdef TOOLS_ENABLED
 			if (editor) {
 
-				Error serr = editor_node->load_scene(local_game_path);
-				if (serr != OK)
-					ERR_PRINT("Failed to load scene");
+				if (game_path != GLOBAL_GET("application/run/main_scene") || !editor_node->has_scenes_in_session()) {
+					Error serr = editor_node->load_scene(local_game_path);
+					if (serr != OK)
+						ERR_PRINT("Failed to load scene");
+				}
 				OS::get_singleton()->set_context(OS::CONTEXT_EDITOR);
 			}
 #endif
+			if (!editor) {
+				OS::get_singleton()->set_context(OS::CONTEXT_ENGINE);
+			}
 		}
 
 		if (!project_manager && !editor) { // game
@@ -1955,10 +1963,12 @@ void Main::force_redraw() {
  * so that the engine closes cleanly without leaking memory or crashing.
  * The order matters as some of those steps are linked with each other.
  */
-
 void Main::cleanup() {
 
 	ERR_FAIL_COND(!_start_success);
+
+	ResourceLoader::remove_custom_loaders();
+	ResourceSaver::remove_custom_savers();
 
 	message_queue->flush();
 	memdelete(message_queue);
@@ -1990,6 +2000,8 @@ void Main::cleanup() {
 		// cleanup now before we pull the rug from underneath...
 		memdelete(arvr_server);
 	}
+
+	ImageLoader::cleanup();
 
 	unregister_driver_types();
 	unregister_module_types();

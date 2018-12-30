@@ -141,7 +141,7 @@ protected:
 	static void _bind_methods();
 
 public:
-	bool is_valid() const { return valid; }
+	virtual bool is_valid() const { return valid; }
 
 	const Map<StringName, Ref<GDScript> > &get_subclasses() const { return subclasses; }
 	const Map<StringName, Variant> &get_constants() const { return constants; }
@@ -500,6 +500,7 @@ public:
 };
 
 class ResourceFormatLoaderGDScript : public ResourceFormatLoader {
+	GDCLASS(ResourceFormatLoaderGDScript, ResourceFormatLoader)
 public:
 	virtual RES load(const String &p_path, const String &p_original_path = "", Error *r_error = NULL);
 	virtual void get_recognized_extensions(List<String> *p_extensions) const;
@@ -508,6 +509,7 @@ public:
 };
 
 class ResourceFormatSaverGDScript : public ResourceFormatSaver {
+	GDCLASS(ResourceFormatSaverGDScript, ResourceFormatSaver)
 public:
 	virtual Error save(const String &p_path, const RES &p_resource, uint32_t p_flags = 0);
 	virtual void get_recognized_extensions(const RES &p_resource, List<String> *p_extensions) const;

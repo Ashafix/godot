@@ -179,7 +179,7 @@ void String::copy_from_unchecked(const CharType *p_char, const int p_length) {
 	resize(p_length + 1);
 	set(p_length, 0);
 
-	CharType *dst = &operator[](0);
+	CharType *dst = ptrw();
 
 	for (int i = 0; i < p_length; i++) {
 		dst[i] = p_char[i];
@@ -250,7 +250,7 @@ String &String::operator+=(const String &p_str) {
 	resize(length() + p_str.size());
 
 	const CharType *src = p_str.c_str();
-	CharType *dst = &operator[](0);
+	CharType *dst = ptrw();
 
 	set(length(), 0);
 
@@ -289,7 +289,7 @@ String &String::operator+=(const char *p_str) {
 
 	resize(from + src_len + 1);
 
-	CharType *dst = &operator[](0);
+	CharType *dst = ptrw();
 
 	set(length(), 0);
 
@@ -1431,7 +1431,7 @@ bool String::parse_utf8(const char *p_utf8, int p_len) {
 	}
 
 	resize(str_size + 1);
-	CharType *dst = &operator[](0);
+	CharType *dst = ptrw();
 	dst[str_size] = 0;
 
 	while (cstr_size) {
@@ -2774,16 +2774,13 @@ String String::format(const Variant &values, String placeholder) const {
 
 				if (value_arr.size() == 2) {
 					Variant v_key = value_arr[0];
-					String key;
-
-					key = v_key.get_construct_string();
+					String key = v_key;
 					if (key.left(1) == "\"" && key.right(key.length() - 1) == "\"") {
 						key = key.substr(1, key.length() - 2);
 					}
 
 					Variant v_val = value_arr[1];
-					String val;
-					val = v_val.get_construct_string();
+					String val = v_val;
 
 					if (val.left(1) == "\"" && val.right(val.length() - 1) == "\"") {
 						val = val.substr(1, val.length() - 2);
@@ -2795,8 +2792,7 @@ String String::format(const Variant &values, String placeholder) const {
 				}
 			} else { //Array structure ["RobotGuy","Logis","rookie"]
 				Variant v_val = values_arr[i];
-				String val;
-				val = v_val.get_construct_string();
+				String val = v_val;
 
 				if (val.left(1) == "\"" && val.right(val.length() - 1) == "\"") {
 					val = val.substr(1, val.length() - 2);
@@ -2815,8 +2811,8 @@ String String::format(const Variant &values, String placeholder) const {
 		d.get_key_list(&keys);
 
 		for (List<Variant>::Element *E = keys.front(); E; E = E->next()) {
-			String key = E->get().get_construct_string();
-			String val = d[E->get()].get_construct_string();
+			String key = E->get();
+			String val = d[E->get()];
 
 			if (key.left(1) == "\"" && key.right(key.length() - 1) == "\"") {
 				key = key.substr(1, key.length() - 2);
@@ -3480,7 +3476,7 @@ String String::xml_unescape() const {
 	if (len == 0)
 		return String();
 	str.resize(len + 1);
-	_xml_unescape(c_str(), l, &str[0]);
+	_xml_unescape(c_str(), l, str.ptrw());
 	str[len] = 0;
 	return str;
 }
@@ -4039,7 +4035,7 @@ String String::sprintf(const Array &values, bool *error) const {
 					str = str.pad_decimals(min_decimals);
 
 					// Show sign
-					if (show_sign && value >= 0) {
+					if (show_sign && str.left(1) != "-") {
 						str = str.insert(0, "+");
 					}
 

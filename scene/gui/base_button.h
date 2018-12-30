@@ -51,6 +51,7 @@ public:
 private:
 	int button_mask;
 	bool toggle_mode;
+	bool shortcut_in_tooltip;
 	FocusMode enabled_focus_mode;
 	Ref<ShortCut> shortcut;
 
@@ -100,6 +101,9 @@ public:
 	void set_toggle_mode(bool p_on);
 	bool is_toggle_mode() const;
 
+	void set_shortcut_in_tooltip(bool p_on);
+	bool is_shortcut_in_tooltip_enabled() const;
+
 	void set_disabled(bool p_disabled);
 	bool is_disabled() const;
 
@@ -139,6 +143,7 @@ protected:
 public:
 	BaseButton *get_pressed_button();
 	void get_buttons(List<BaseButton *> *r_buttons);
+	Array _get_buttons();
 	ButtonGroup();
 };
 

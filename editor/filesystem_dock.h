@@ -73,7 +73,6 @@ private:
 
 	enum DisplayMode {
 		DISPLAY_MODE_TREE_ONLY,
-		DISPLAY_MODE_FILE_LIST_ONLY,
 		DISPLAY_MODE_SPLIT,
 	};
 
@@ -109,7 +108,6 @@ private:
 
 	Button *button_toggle_display_mode;
 	Button *button_reload;
-	Button *button_tree;
 	Button *button_file_list_display_mode;
 	Button *button_hist_next;
 	Button *button_hist_prev;
@@ -127,7 +125,6 @@ private:
 	DisplayMode display_mode;
 	DisplayModeSetting display_mode_setting;
 	DisplayModeSetting old_display_mode_setting;
-	bool file_list_view;
 
 	PopupMenu *file_list_popup;
 	PopupMenu *tree_popup;
@@ -193,8 +190,7 @@ private:
 	void _change_file_display();
 	void _fs_changed();
 
-	void _go_to_tree();
-	void _go_to_file_list();
+	void _tree_toggle_collapsed();
 
 	void _select_file(const String p_path);
 	void _tree_activate_file();
@@ -206,12 +202,17 @@ private:
 
 	void _get_all_items_in_dir(EditorFileSystemDirectory *efsd, Vector<String> &files, Vector<String> &folders) const;
 	void _find_remaps(EditorFileSystemDirectory *efsd, const Map<String, String> &renames, Vector<String> &to_remaps) const;
-	void _try_move_item(const FileOrFolder &p_item, const String &p_new_path, Map<String, String> &p_file_renames, Map<String, String> &p_folder_renames) const;
+	void _try_move_item(const FileOrFolder &p_item, const String &p_new_path, Map<String, String> &p_file_renames, Map<String, String> &p_folder_renames);
 	void _try_duplicate_item(const FileOrFolder &p_item, const String &p_new_path) const;
 	void _update_dependencies_after_move(const Map<String, String> &p_renames) const;
 	void _update_resource_paths_after_move(const Map<String, String> &p_renames) const;
 	void _update_favorites_list_after_move(const Map<String, String> &p_files_renames, const Map<String, String> &p_folders_renames) const;
 	void _update_project_settings_after_move(const Map<String, String> &p_folders_renames) const;
+
+	void _file_deleted(String p_file);
+	void _folder_deleted(String p_folder);
+	void _files_moved(String p_old_file, String p_new_file);
+	void _folder_moved(String p_old_folder, String p_new_folder);
 
 	void _resource_created() const;
 	void _make_dir_confirm();
@@ -237,7 +238,7 @@ private:
 
 	void _search_changed(const String &p_text, const Control *p_from);
 
-	void _file_and_folders_fill_popup(PopupMenu *p_popup, Vector<String> p_paths);
+	void _file_and_folders_fill_popup(PopupMenu *p_popup, Vector<String> p_paths, bool p_display_path_dependent_options = true);
 	void _tree_rmb_select(const Vector2 &p_pos);
 	void _file_list_rmb_select(int p_item, const Vector2 &p_pos);
 	void _file_list_rmb_pressed(const Vector2 &p_pos);

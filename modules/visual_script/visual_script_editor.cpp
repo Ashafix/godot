@@ -765,6 +765,7 @@ void VisualScriptEditor::_update_graph(int p_only_id) {
 }
 
 void VisualScriptEditor::_update_members() {
+	ERR_FAIL_COND(!script.is_valid());
 
 	updating_members = true;
 
@@ -1922,7 +1923,7 @@ void VisualScriptEditor::drop_data_fw(const Point2 &p_point, const Variant &p_da
 	}
 }
 
-void VisualScriptEditor::_selected_method(const String &p_method, const String &p_type) {
+void VisualScriptEditor::_selected_method(const String &p_method, const String &p_type, const bool p_connecting) {
 
 	Ref<VisualScriptFunctionCall> vsfc = script->get_node(edited_func, selecting_method_id);
 	if (!vsfc.is_valid())
@@ -3061,7 +3062,7 @@ void VisualScriptEditor::_notification(int p_what) {
 			}
 		}
 
-		if (is_visible_in_tree()) {
+		if (is_visible_in_tree() && script.is_valid()) {
 			_update_members();
 			_update_graph();
 		}
@@ -3490,6 +3491,7 @@ VisualScriptEditor::VisualScriptEditor() {
 
 	edit_menu = memnew(MenuButton);
 	edit_menu->set_text(TTR("Edit"));
+	edit_menu->set_switch_on_hover(true);
 	edit_menu->get_popup()->add_shortcut(ED_GET_SHORTCUT("visual_script_editor/delete_selected"), EDIT_DELETE_NODES);
 	edit_menu->get_popup()->add_shortcut(ED_GET_SHORTCUT("visual_script_editor/toggle_breakpoint"), EDIT_TOGGLE_BREAKPOINT);
 	edit_menu->get_popup()->add_shortcut(ED_GET_SHORTCUT("visual_script_editor/find_node_type"), EDIT_FIND_NODE_TYPE);
@@ -3652,7 +3654,7 @@ VisualScriptEditor::VisualScriptEditor() {
 	new_virtual_method_select = memnew(VisualScriptPropertySelector);
 	add_child(new_virtual_method_select);
 	new_virtual_method_select->connect("selected", this, "_selected_new_virtual_method");
-	new_virtual_method_select->get_cancel()->connect("pressed", this, "_selected_new_virtual_method");
+	new_virtual_method_select->get_cancel();
 
 	member_popup = memnew(PopupMenu);
 	add_child(member_popup);

@@ -37,6 +37,7 @@
 #include "editor/editor_file_dialog.h"
 #include "editor/editor_file_system.h"
 #include "editor/editor_inspector.h"
+#include "editor/editor_properties.h"
 #include "scene/gui/button.h"
 #include "scene/gui/check_button.h"
 #include "scene/gui/control.h"
@@ -66,6 +67,7 @@ private:
 	ItemList *presets;
 
 	LineEdit *name;
+	EditorPropertyPath *export_path;
 	EditorInspector *parameters;
 	CheckButton *runnable;
 
@@ -92,6 +94,8 @@ private:
 	ConfirmationDialog *patch_erase;
 
 	Button *export_button;
+	Button *export_all_button;
+	AcceptDialog *export_all_dialog;
 
 	LineEdit *custom_features;
 	RichTextLabel *custom_feature_display;
@@ -107,11 +111,13 @@ private:
 	void _runnable_pressed();
 	void _update_parameters(const String &p_edited_property);
 	void _name_changed(const String &p_string);
+	void _export_path_changed(const StringName &p_property, const Variant &p_value);
 	void _add_preset(int p_platform);
 	void _edit_preset(int p_index);
 	void _duplicate_preset();
 	void _delete_preset();
 	void _delete_preset_confirm();
+	void _update_export_all();
 
 	void _update_presets();
 
@@ -141,6 +147,9 @@ private:
 	void _validate_export_path(const String &p_path);
 	void _export_project();
 	void _export_project_to_path(const String &p_path);
+	void _export_all_dialog();
+	void _export_all_dialog_action(const String &p_str);
+	void _export_all(bool p_debug);
 
 	void _update_feature_list();
 	void _custom_features_changed(const String &p_text);
@@ -153,6 +162,9 @@ protected:
 
 public:
 	void popup_export();
+
+	void set_export_path(const String &p_value);
+	String get_export_path();
 
 	ProjectExportDialog();
 	~ProjectExportDialog();

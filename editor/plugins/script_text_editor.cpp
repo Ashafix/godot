@@ -280,6 +280,13 @@ void ScriptTextEditor::_toggle_warning_pannel(const Ref<InputEvent> &p_event) {
 	}
 }
 
+void ScriptTextEditor::_error_pressed(const Ref<InputEvent> &p_event) {
+	Ref<InputEventMouseButton> mb = p_event;
+	if (mb.is_valid() && mb->is_pressed() && mb->get_button_index() == BUTTON_LEFT) {
+		code_editor->goto_error();
+	}
+}
+
 void ScriptTextEditor::_warning_clicked(Variant p_line) {
 	if (p_line.get_type() == Variant::INT) {
 		code_editor->get_text_edit()->cursor_set_line(p_line.operator int64_t());
@@ -443,6 +450,7 @@ void ScriptTextEditor::_validate_script() {
 	if (!script->get_language()->validate(text, line, col, errortxt, script->get_path(), &fnc, &warnings, &safe_lines)) {
 		String error_text = "error(" + itos(line) + "," + itos(col) + "): " + errortxt;
 		code_editor->set_error(error_text);
+		code_editor->set_error_pos(line - 1, col - 1);
 	} else {
 		code_editor->set_error("");
 		line = -1;
@@ -773,7 +781,7 @@ void ScriptTextEditor::_edit_option(int p_op) {
 		} break;
 		case EDIT_CLONE_DOWN: {
 
-			code_editor->code_lines_down();
+			code_editor->clone_lines_down();
 		} break;
 		case EDIT_TOGGLE_FOLD_LINE: {
 
@@ -1049,7 +1057,7 @@ void ScriptTextEditor::_edit_option(int p_op) {
 			if (text == "")
 				text = tx->get_word_under_cursor();
 			if (text != "") {
-				emit_signal("request_help_search", text);
+				emit_signal("request_help", text);
 			}
 		} break;
 		case LOOKUP_SYMBOL: {
@@ -1075,7 +1083,7 @@ void ScriptTextEditor::set_syntax_highlighter(SyntaxHighlighter *p_highlighter) 
 	if (p_highlighter != NULL)
 		highlighter_menu->set_item_checked(highlighter_menu->get_item_idx_from_text(p_highlighter->get_name()), true);
 	else
-		highlighter_menu->set_item_checked(highlighter_menu->get_item_idx_from_text("Standard"), true);
+		highlighter_menu->set_item_checked(highlighter_menu->get_item_idx_from_text(TTR("Standard")), true);
 }
 
 void ScriptTextEditor::_change_syntax_highlighter(int p_idx) {
@@ -1100,6 +1108,7 @@ void ScriptTextEditor::_bind_methods() {
 	ClassDB::bind_method("_lookup_symbol", &ScriptTextEditor::_lookup_symbol);
 	ClassDB::bind_method("_text_edit_gui_input", &ScriptTextEditor::_text_edit_gui_input);
 	ClassDB::bind_method("_toggle_warning_pannel", &ScriptTextEditor::_toggle_warning_pannel);
+	ClassDB::bind_method("_error_pressed", &ScriptTextEditor::_error_pressed);
 	ClassDB::bind_method("_warning_clicked", &ScriptTextEditor::_warning_clicked);
 	ClassDB::bind_method("_color_changed", &ScriptTextEditor::_color_changed);
 
@@ -1436,6 +1445,7 @@ ScriptTextEditor::ScriptTextEditor() {
 	warnings_panel->set_focus_mode(FOCUS_CLICK);
 	warnings_panel->hide();
 
+	code_editor->get_error_label()->connect("gui_input", this, "_error_pressed");
 	code_editor->get_warning_label()->connect("gui_input", this, "_toggle_warning_pannel");
 	code_editor->get_warning_count_label()->connect("gui_input", this, "_toggle_warning_pannel");
 	warnings_panel->connect("meta_clicked", this, "_warning_clicked");
@@ -1465,6 +1475,7 @@ ScriptTextEditor::ScriptTextEditor() {
 
 	edit_menu = memnew(MenuButton);
 	edit_menu->set_text(TTR("Edit"));
+	edit_menu->set_switch_on_hover(true);
 	edit_menu->get_popup()->set_hide_on_window_lose_focus(true);
 	edit_menu->get_popup()->add_shortcut(ED_GET_SHORTCUT("script_text_editor/undo"), EDIT_UNDO);
 	edit_menu->get_popup()->add_shortcut(ED_GET_SHORTCUT("script_text_editor/redo"), EDIT_REDO);
@@ -1508,7 +1519,7 @@ ScriptTextEditor::ScriptTextEditor() {
 	convert_case->add_shortcut(ED_SHORTCUT("script_text_editor/capitalize", TTR("Capitalize"), KEY_MASK_SHIFT | KEY_F6), EDIT_CAPITALIZE);
 	convert_case->connect("id_pressed", this, "_edit_option");
 
-	highlighters["Standard"] = NULL;
+	highlighters[TTR("Standard")] = NULL;
 	highlighter_menu = memnew(PopupMenu);
 	highlighter_menu->set_name("highlighter_menu");
 	edit_menu->get_popup()->add_child(highlighter_menu);
@@ -1519,6 +1530,7 @@ ScriptTextEditor::ScriptTextEditor() {
 	search_menu = memnew(MenuButton);
 	edit_hb->add_child(search_menu);
 	search_menu->set_text(TTR("Search"));
+	search_menu->set_switch_on_hover(true);
 	search_menu->get_popup()->set_hide_on_window_lose_focus(true);
 	search_menu->get_popup()->add_shortcut(ED_GET_SHORTCUT("script_text_editor/find"), SEARCH_FIND);
 	search_menu->get_popup()->add_shortcut(ED_GET_SHORTCUT("script_text_editor/find_next"), SEARCH_FIND_NEXT);
@@ -1583,8 +1595,8 @@ void ScriptTextEditor::register_editor() {
 	ED_SHORTCUT("script_text_editor/complete_symbol", TTR("Complete Symbol"), KEY_MASK_CMD | KEY_SPACE);
 #endif
 	ED_SHORTCUT("script_text_editor/trim_trailing_whitespace", TTR("Trim Trailing Whitespace"), KEY_MASK_CMD | KEY_MASK_ALT | KEY_T);
-	ED_SHORTCUT("script_text_editor/convert_indent_to_spaces", TTR("Convert Indent To Spaces"), KEY_MASK_CMD | KEY_MASK_SHIFT | KEY_Y);
-	ED_SHORTCUT("script_text_editor/convert_indent_to_tabs", TTR("Convert Indent To Tabs"), KEY_MASK_CMD | KEY_MASK_SHIFT | KEY_I);
+	ED_SHORTCUT("script_text_editor/convert_indent_to_spaces", TTR("Convert Indent to Spaces"), KEY_MASK_CMD | KEY_MASK_SHIFT | KEY_Y);
+	ED_SHORTCUT("script_text_editor/convert_indent_to_tabs", TTR("Convert Indent to Tabs"), KEY_MASK_CMD | KEY_MASK_SHIFT | KEY_I);
 	ED_SHORTCUT("script_text_editor/auto_indent", TTR("Auto Indent"), KEY_MASK_CMD | KEY_I);
 
 #ifdef OSX_ENABLED

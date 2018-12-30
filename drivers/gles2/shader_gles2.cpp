@@ -99,7 +99,7 @@ void ShaderGLES2::bind_uniforms() {
 	const Map<uint32_t, CameraMatrix>::Element *C = uniform_cameras.front();
 
 	while (C) {
-		int idx = E->key();
+		int idx = C->key();
 		int location = version->uniform_location[idx];
 
 		if (location < 0) {
@@ -194,6 +194,12 @@ static void _display_error_with_code(const String &p_error, const Vector<const c
 	}
 
 	ERR_PRINTS(p_error);
+}
+
+static String _mkid(const String &p_id) {
+
+	String id = "m_" + p_id;
+	return id.replace("__", "_dus_"); //doubleunderscore is reserverd in glsl
 }
 
 ShaderGLES2::Version *ShaderGLES2::get_current_version() {
@@ -358,14 +364,14 @@ ShaderGLES2::Version *ShaderGLES2::get_current_version() {
 	strings.push_back(fragment_code1.get_data());
 
 	if (cc) {
-		code_string = cc->fragment.ascii();
+		code_string = cc->light.ascii();
 		strings.push_back(code_string.get_data());
 	}
 
 	strings.push_back(fragment_code2.get_data());
 
 	if (cc) {
-		code_string2 = cc->light.ascii();
+		code_string2 = cc->fragment.ascii();
 		strings.push_back(code_string2.get_data());
 	}
 
@@ -492,15 +498,15 @@ ShaderGLES2::Version *ShaderGLES2::get_current_version() {
 	if (cc) {
 		// uniforms
 		for (int i = 0; i < cc->custom_uniforms.size(); i++) {
-			StringName native_uniform_name = "m_" + cc->custom_uniforms[i];
-			GLint location = glGetUniformLocation(v.id, ((String)native_uniform_name).ascii().get_data());
+			String native_uniform_name = _mkid(cc->custom_uniforms[i]);
+			GLint location = glGetUniformLocation(v.id, (native_uniform_name).ascii().get_data());
 			v.custom_uniform_locations[cc->custom_uniforms[i]] = location;
 		}
 
 		// textures
 		for (int i = 0; i < cc->texture_uniforms.size(); i++) {
-			StringName native_uniform_name = "m_" + cc->texture_uniforms[i];
-			GLint location = glGetUniformLocation(v.id, ((String)native_uniform_name).ascii().get_data());
+			String native_uniform_name = _mkid(cc->texture_uniforms[i]);
+			GLint location = glGetUniformLocation(v.id, (native_uniform_name).ascii().get_data());
 			v.custom_uniform_locations[cc->texture_uniforms[i]] = location;
 		}
 	}
@@ -582,22 +588,24 @@ void ShaderGLES2::setup(
 			fragment_code0 = code.substr(0, cpos).ascii();
 			code = code.substr(cpos + globals_tag.length(), code.length());
 
-			cpos = code.find(code_tag);
+			cpos = code.find(light_code_tag);
 
-			if (cpos == -1) {
-				fragment_code1 = code.ascii();
-			} else {
+			String code2;
+
+			if (cpos != -1) {
 
 				fragment_code1 = code.substr(0, cpos).ascii();
-				String code2 = code.substr(cpos + code_tag.length(), code.length());
+				code2 = code.substr(cpos + light_code_tag.length(), code.length());
+			} else {
+				code2 = code;
+			}
 
-				cpos = code2.find(light_code_tag);
-				if (cpos == -1) {
-					fragment_code2 = code2.ascii();
-				} else {
-					fragment_code2 = code2.substr(0, cpos).ascii();
-					fragment_code3 = code2.substr(cpos + light_code_tag.length(), code2.length()).ascii();
-				}
+			cpos = code2.find(code_tag);
+			if (cpos == -1) {
+				fragment_code2 = code2.ascii();
+			} else {
+				fragment_code2 = code2.substr(0, cpos).ascii();
+				fragment_code3 = code2.substr(cpos + code_tag.length(), code2.length()).ascii();
 			}
 		}
 	}

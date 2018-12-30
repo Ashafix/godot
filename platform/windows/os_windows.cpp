@@ -58,11 +58,8 @@
 static const WORD MAX_CONSOLE_LINES = 1500;
 
 extern "C" {
-#ifdef _MSC_VER
-_declspec(dllexport) DWORD NvOptimusEnablement = 0x00000001;
-#else
-__attribute__((visibility("default"))) DWORD NvOptimusEnablement = 0x00000001;
-#endif
+__declspec(dllexport) DWORD NvOptimusEnablement = 1;
+__declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
 }
 
 // Workaround mingw-w64 < 4.0 bug
@@ -303,19 +300,17 @@ LRESULT OS_Windows::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 	{
 		case WM_SETFOCUS: {
 			window_has_focus = true;
-			// Re-capture cursor if we're in one of the capture modes
-			if (mouse_mode == MOUSE_MODE_CAPTURED || mouse_mode == MOUSE_MODE_CONFINED) {
-				SetCapture(hWnd);
-			}
+
+			// Restore mouse mode
+			_set_mouse_mode_impl(mouse_mode);
+
 			break;
 		}
 		case WM_KILLFOCUS: {
 			window_has_focus = false;
 
-			// Release capture if we're in one of the capture modes
-			if (mouse_mode == MOUSE_MODE_CAPTURED || mouse_mode == MOUSE_MODE_CONFINED) {
-				ReleaseCapture();
-			}
+			// Release capture unconditionally because it can be set due to dragging, in addition to captured mode
+			ReleaseCapture();
 
 			// Release every touch to avoid sticky points
 			for (Map<int, Vector2>::Element *E = touch_state.front(); E; E = E->next()) {
@@ -337,15 +332,7 @@ LRESULT OS_Windows::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 				alt_mem = false;
 				control_mem = false;
 				shift_mem = false;
-				if (mouse_mode == MOUSE_MODE_CAPTURED || mouse_mode == MOUSE_MODE_CONFINED) {
-					RECT clipRect;
-					GetClientRect(hWnd, &clipRect);
-					ClientToScreen(hWnd, (POINT *)&clipRect.left);
-					ClientToScreen(hWnd, (POINT *)&clipRect.right);
-					ClipCursor(&clipRect);
-					SetCapture(hWnd);
-				}
-			} else {
+			} else { // WM_INACTIVE
 				main_loop->notification(MainLoop::NOTIFICATION_WM_FOCUS_OUT);
 				alt_mem = false;
 			};
@@ -509,15 +496,7 @@ LRESULT OS_Windows::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 			mm->set_shift((wParam & MK_SHIFT) != 0);
 			mm->set_alt(alt_mem);
 
-			int bmask = 0;
-			bmask |= (wParam & MK_LBUTTON) ? (1 << 0) : 0;
-			bmask |= (wParam & MK_RBUTTON) ? (1 << 1) : 0;
-			bmask |= (wParam & MK_MBUTTON) ? (1 << 2) : 0;
-			bmask |= (wParam & MK_XBUTTON1) ? (1 << 7) : 0;
-			bmask |= (wParam & MK_XBUTTON2) ? (1 << 8) : 0;
-			mm->set_button_mask(bmask);
-
-			last_button_state = mm->get_button_mask();
+			mm->set_button_mask(last_button_state);
 
 			mm->set_position(Vector2(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)));
 			mm->set_global_position(Vector2(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)));
@@ -686,15 +665,12 @@ LRESULT OS_Windows::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 			mb->set_shift((wParam & MK_SHIFT) != 0);
 			mb->set_alt(alt_mem);
 			//mb->get_alt()=(wParam&MK_MENU)!=0;
-			int bmask = 0;
-			bmask |= (wParam & MK_LBUTTON) ? (1 << 0) : 0;
-			bmask |= (wParam & MK_RBUTTON) ? (1 << 1) : 0;
-			bmask |= (wParam & MK_MBUTTON) ? (1 << 2) : 0;
-			bmask |= (wParam & MK_XBUTTON1) ? (1 << 7) : 0;
-			bmask |= (wParam & MK_XBUTTON2) ? (1 << 8) : 0;
-			mb->set_button_mask(bmask);
+			if (mb->is_pressed())
+				last_button_state |= (1 << (mb->get_button_index() - 1));
+			else
+				last_button_state &= ~(1 << (mb->get_button_index() - 1));
+			mb->set_button_mask(last_button_state);
 
-			last_button_state = mb->get_button_mask();
 			mb->set_position(Vector2(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)));
 
 			if (mouse_mode == MOUSE_MODE_CAPTURED && !use_raw_input) {
@@ -705,12 +681,14 @@ LRESULT OS_Windows::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 			if (uMsg != WM_MOUSEWHEEL && uMsg != WM_MOUSEHWHEEL) {
 				if (mb->is_pressed()) {
 
-					if (++pressrc > 0)
+					if (++pressrc > 0 && mouse_mode != MOUSE_MODE_CAPTURED)
 						SetCapture(hWnd);
 				} else {
 
 					if (--pressrc <= 0) {
-						ReleaseCapture();
+						if (mouse_mode != MOUSE_MODE_CAPTURED) {
+							ReleaseCapture();
+						}
 						pressrc = 0;
 					}
 				}
@@ -732,22 +710,36 @@ LRESULT OS_Windows::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 				if (mb->is_pressed() && mb->get_button_index() > 3 && mb->get_button_index() < 8) {
 					//send release for mouse wheel
 					Ref<InputEventMouseButton> mbd = mb->duplicate();
+					last_button_state &= ~(1 << (mbd->get_button_index() - 1));
+					mbd->set_button_mask(last_button_state);
 					mbd->set_pressed(false);
 					input->parse_input_event(mbd);
 				}
 			}
 		} break;
 
-		case WM_SIZE: {
-			int window_w = LOWORD(lParam);
-			int window_h = HIWORD(lParam);
-			if (window_w > 0 && window_h > 0 && !preserve_window_size) {
-				video_mode.width = window_w;
-				video_mode.height = window_h;
-			} else {
-				preserve_window_size = false;
-				set_window_size(Size2(video_mode.width, video_mode.height));
+		case WM_MOVE: {
+			if (!IsIconic(hWnd)) {
+				int x = LOWORD(lParam);
+				int y = HIWORD(lParam);
+				last_pos = Point2(x, y);
 			}
+		} break;
+
+		case WM_SIZE: {
+			// Ignore size when a SIZE_MINIMIZED event is triggered
+			if (wParam != SIZE_MINIMIZED) {
+				int window_w = LOWORD(lParam);
+				int window_h = HIWORD(lParam);
+				if (window_w > 0 && window_h > 0 && !preserve_window_size) {
+					video_mode.width = window_w;
+					video_mode.height = window_h;
+				} else {
+					preserve_window_size = false;
+					set_window_size(Size2(video_mode.width, video_mode.height));
+				}
+			}
+
 			if (wParam == SIZE_MAXIMIZED) {
 				maximized = true;
 				minimized = false;
@@ -1334,24 +1326,9 @@ Error OS_Windows::initialize(const VideoMode &p_desired, int p_video_driver, int
 
 	visual_server = memnew(VisualServerRaster);
 	if (get_render_thread_mode() != RENDER_THREAD_UNSAFE) {
-
 		visual_server = memnew(VisualServerWrapMT(visual_server, get_render_thread_mode() == RENDER_SEPARATE_THREAD));
 	}
 
-	/*
-		DEVMODE dmScreenSettings;					// Device Mode
-		memset(&dmScreenSettings,0,sizeof(dmScreenSettings));		// Makes Sure Memory's Cleared
-		dmScreenSettings.dmSize=sizeof(dmScreenSettings);		// Size Of The Devmode Structure
-		dmScreenSettings.dmPelsWidth	= width;			// Selected Screen Width
-		dmScreenSettings.dmPelsHeight	= height;			// Selected Screen Height
-		dmScreenSettings.dmBitsPerPel	= bits;				// Selected Bits Per Pixel
-		dmScreenSettings.dmFields=DM_BITSPERPEL|DM_PELSWIDTH|DM_PELSHEIGHT;
-		if (ChangeDisplaySettings(&dmScreenSettings,CDS_FULLSCREEN)!=DISP_CHANGE_SUCCESSFUL)
-
-
-
-
-  */
 	visual_server->init();
 
 	input = memnew(InputDefault);
@@ -1534,18 +1511,27 @@ void OS_Windows::set_mouse_mode(MouseMode p_mode) {
 
 	if (mouse_mode == p_mode)
 		return;
+
+	_set_mouse_mode_impl(p_mode);
+
 	mouse_mode = p_mode;
-	if (mouse_mode == MOUSE_MODE_CAPTURED || mouse_mode == MOUSE_MODE_CONFINED) {
+}
+
+void OS_Windows::_set_mouse_mode_impl(MouseMode p_mode) {
+
+	if (p_mode == MOUSE_MODE_CAPTURED || p_mode == MOUSE_MODE_CONFINED) {
 		RECT clipRect;
 		GetClientRect(hWnd, &clipRect);
 		ClientToScreen(hWnd, (POINT *)&clipRect.left);
 		ClientToScreen(hWnd, (POINT *)&clipRect.right);
 		ClipCursor(&clipRect);
-		center = Point2i(video_mode.width / 2, video_mode.height / 2);
-		POINT pos = { (int)center.x, (int)center.y };
-		ClientToScreen(hWnd, &pos);
-		if (mouse_mode == MOUSE_MODE_CAPTURED)
+		if (p_mode == MOUSE_MODE_CAPTURED) {
+			center = Point2i(video_mode.width / 2, video_mode.height / 2);
+			POINT pos = { (int)center.x, (int)center.y };
+			ClientToScreen(hWnd, &pos);
 			SetCursorPos(pos.x, pos.y);
+			SetCapture(hWnd);
+		}
 	} else {
 		ReleaseCapture();
 		ClipCursor(NULL);
@@ -1559,7 +1545,6 @@ void OS_Windows::set_mouse_mode(MouseMode p_mode) {
 		set_cursor_shape(c);
 	}
 }
-
 OS_Windows::MouseMode OS_Windows::get_mouse_mode() const {
 
 	return mouse_mode;
@@ -1703,6 +1688,10 @@ int OS_Windows::get_screen_dpi(int p_screen) const {
 
 Point2 OS_Windows::get_window_position() const {
 
+	if (minimized) {
+		return last_pos;
+	}
+
 	RECT r;
 	GetWindowRect(hWnd, &r);
 	return Point2(r.left, r.top);
@@ -1723,8 +1712,14 @@ void OS_Windows::set_window_position(const Point2 &p_position) {
 		ClientToScreen(hWnd, (POINT *)&rect.right);
 		ClipCursor(&rect);
 	}
+
+	last_pos = p_position;
 }
 Size2 OS_Windows::get_window_size() const {
+
+	if (minimized) {
+		return Size2(video_mode.width, video_mode.height);
+	}
 
 	RECT r;
 	if (GetClientRect(hWnd, &r)) { // Only area inside of window border
@@ -2147,8 +2142,13 @@ uint64_t OS_Windows::get_unix_time() const {
 
 uint64_t OS_Windows::get_system_time_secs() const {
 
-	const uint64_t WINDOWS_TICK = 10000000;
-	const uint64_t SEC_TO_UNIX_EPOCH = 11644473600LL;
+	return get_system_time_msecs() / 1000;
+}
+
+uint64_t OS_Windows::get_system_time_msecs() const {
+
+	const uint64_t WINDOWS_TICK = 10000;
+	const uint64_t MSEC_TO_UNIX_EPOCH = 11644473600000LL;
 
 	SYSTEMTIME st;
 	GetSystemTime(&st);
@@ -2159,7 +2159,7 @@ uint64_t OS_Windows::get_system_time_secs() const {
 	ret <<= 32;
 	ret |= ft.dwLowDateTime;
 
-	return (uint64_t)(ret / WINDOWS_TICK - SEC_TO_UNIX_EPOCH);
+	return (uint64_t)(ret / WINDOWS_TICK - MSEC_TO_UNIX_EPOCH);
 }
 
 void OS_Windows::delay_usec(uint32_t p_usec) const {

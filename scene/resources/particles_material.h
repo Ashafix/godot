@@ -60,7 +60,6 @@ public:
 		FLAG_ALIGN_Y_TO_VELOCITY,
 		FLAG_ROTATE_Y,
 		FLAG_DISABLE_Z,
-		FLAG_ANIM_LOOP,
 		FLAG_MAX
 	};
 
@@ -127,7 +126,7 @@ private:
 	}
 
 	static Mutex *material_mutex;
-	static SelfList<ParticlesMaterial>::List dirty_materials;
+	static SelfList<ParticlesMaterial>::List *dirty_materials;
 
 	struct ShaderNames {
 		StringName spread;

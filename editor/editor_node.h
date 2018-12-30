@@ -180,7 +180,6 @@ private:
 		SETTINGS_HELP,
 		SCENE_TAB_CLOSE,
 
-		HELP_CLASSES,
 		HELP_SEARCH,
 		HELP_DOCS,
 		HELP_QA,
@@ -244,7 +243,6 @@ private:
 	Control *vp_base;
 	PaneDrag *pd;
 
-	CenterContainer *play_cc;
 	HBoxContainer *menu_hb;
 	Control *viewport;
 	MenuButton *file_menu;
@@ -256,7 +254,6 @@ private:
 	ToolButton *export_button;
 	ToolButton *prev_scene;
 	ToolButton *play_button;
-	MenuButton *native_play_button;
 	ToolButton *pause_button;
 	ToolButton *stop_button;
 	ToolButton *run_settings_button;
@@ -272,7 +269,6 @@ private:
 
 	Ref<Theme> theme;
 
-	EditorDefaultClassValueCache *default_value_cache;
 	PopupMenu *recent_scenes;
 	SceneTreeDock *scene_tree_dock;
 	InspectorDock *inspector_dock;
@@ -357,6 +353,7 @@ private:
 	EditorExport *editor_export;
 
 	Object *current;
+	Ref<Resource> saving_resource;
 
 	bool _playing_edited;
 	String run_custom_filename;
@@ -446,6 +443,7 @@ private:
 	void _show_messages();
 	void _vp_resized();
 
+	bool _validate_scene_recursive(const String &p_filename, Node *p_node);
 	void _save_scene(String p_file, int idx = -1);
 	void _save_all_scenes();
 	int _next_unsaved_scene(bool p_valid_filename, int p_start = 0);
@@ -524,6 +522,8 @@ private:
 		String password;
 
 	} export_defer;
+
+	bool disable_progress_dialog;
 
 	static EditorNode *singleton;
 
@@ -606,6 +606,8 @@ private:
 	static void _resource_saved(RES p_resource, const String &p_path);
 	static void _resource_loaded(RES p_resource, const String &p_path);
 
+	void _resources_changed(const PoolVector<String> &p_resources);
+
 protected:
 	void _notification(int p_what);
 	static void _bind_methods();
@@ -635,8 +637,8 @@ public:
 
 	ProjectSettingsEditor *get_project_settings() { return project_settings; }
 
-	static void add_editor_plugin(EditorPlugin *p_editor);
-	static void remove_editor_plugin(EditorPlugin *p_editor);
+	static void add_editor_plugin(EditorPlugin *p_editor, bool p_config_changed = false);
+	static void remove_editor_plugin(EditorPlugin *p_editor, bool p_config_changed = false);
 
 	void new_inherited_scene() { _menu_option_confirm(FILE_NEW_INHERITED_SCENE, false); }
 
@@ -649,7 +651,7 @@ public:
 	void add_control_to_dock(DockSlot p_slot, Control *p_control);
 	void remove_control_from_dock(Control *p_control);
 
-	void set_addon_plugin_enabled(const String &p_addon, bool p_enabled);
+	void set_addon_plugin_enabled(const String &p_addon, bool p_enabled, bool p_config_changed = false);
 	bool is_addon_plugin_enabled(const String &p_addon) const;
 
 	void edit_node(Node *p_node);
@@ -688,7 +690,7 @@ public:
 	void fix_dependencies(const String &p_for_file);
 	void clear_scene() { _cleanup_scene(); }
 	Error load_scene(const String &p_scene, bool p_ignore_broken_deps = false, bool p_set_inherited = false, bool p_clear_errors = true, bool p_force_open_imported = false);
-	Error load_resource(const String &p_scene);
+	Error load_resource(const String &p_resource, bool p_ignore_broken_deps = false);
 
 	bool is_scene_open(const String &p_path);
 
@@ -785,6 +787,7 @@ public:
 	void edit_current() { _edit_current(); };
 
 	void update_keying() const { inspector_dock->update_keying(); };
+	bool has_scenes_in_session();
 
 	EditorNode();
 	~EditorNode();

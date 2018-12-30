@@ -395,7 +395,7 @@ class EditorExportAndroid : public EditorExportPlatform {
 		return aname;
 	}
 
-	String get_package_name(const String &p_package) {
+	String get_package_name(const String &p_package) const {
 
 		String pname = p_package;
 		String basename = ProjectSettings::get_singleton()->get("application/config/name");
@@ -418,6 +418,70 @@ class EditorExportAndroid : public EditorExportPlatform {
 
 		pname = pname.replace("$genname", name);
 		return pname;
+	}
+
+	bool is_package_name_valid(const String &p_package, String *r_error = NULL) const {
+
+		String pname = p_package;
+
+		if (pname.length() == 0) {
+			if (r_error) {
+				*r_error = "Package name is missing.";
+			}
+			return false;
+		}
+
+		int segments = 0;
+		bool first = true;
+		for (int i = 0; i < pname.length(); i++) {
+			CharType c = pname[i];
+			if (first && c == '.') {
+				if (r_error) {
+					*r_error = "Package segments must be of non-zero length.";
+				}
+				return false;
+			}
+			if (c == '.') {
+				segments++;
+				first = true;
+				continue;
+			}
+			if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_')) {
+				if (r_error) {
+					*r_error = "The character '" + String::chr(c) + "' is not allowed in Android application package names.";
+				}
+				return false;
+			}
+			if (first && (c >= '0' && c <= '9')) {
+				if (r_error) {
+					*r_error = "A digit cannot be the first character in a package segment.";
+				}
+				return false;
+			}
+			if (first && c == '_') {
+				if (r_error) {
+					*r_error = "The character '" + String::chr(c) + "' cannot be the first character in a package segment.";
+				}
+				return false;
+			}
+			first = false;
+		}
+
+		if (segments == 0) {
+			if (r_error) {
+				*r_error = "The package must have at least one '.' separator.";
+			}
+			return false;
+		}
+
+		if (first) {
+			if (r_error) {
+				*r_error = "Package segments must be of non-zero length.";
+			}
+			return false;
+		}
+
+		return true;
 	}
 
 	static bool _should_compress_asset(const String &p_path, const Vector<uint8_t> &p_data) {
@@ -487,12 +551,15 @@ class EditorExportAndroid : public EditorExportPlatform {
 	}
 
 	static Vector<String> get_abis() {
-		// mips and armv6 are dead (especially for games), so not including them
 		Vector<String> abis;
+		// We can still build armv7 in theory, but it doesn't make much
+		// sense for games, so disabling for now.
+		//abis.push_back("armeabi");
 		abis.push_back("armeabi-v7a");
 		abis.push_back("arm64-v8a");
 		abis.push_back("x86");
-		abis.push_back("x86_64");
+		// Don't expose x86_64 for now, we don't support it in detect.py
+		//abis.push_back("x86_64");
 		return abis;
 	}
 
@@ -608,10 +675,13 @@ class EditorExportAndroid : public EditorExportPlatform {
 			aperms++;
 		}
 
-		for (int i = 0; i < MAX_USER_PERMISSIONS; i++) {
-			String user_perm = p_preset->get("user_permissions/" + itos(i));
-			if (user_perm.strip_edges() != "" && user_perm.strip_edges() != "False")
-				perms.push_back(user_perm.strip_edges());
+		PoolStringArray user_perms = p_preset->get("permissions/custom_permissions");
+
+		for (int i = 0; i < user_perms.size(); i++) {
+			String user_perm = user_perms[i].strip_edges();
+			if (!user_perm.empty()) {
+				perms.push_back(user_perm);
+			}
 		}
 
 		if (p_give_internet) {
@@ -1040,10 +1110,6 @@ class EditorExportAndroid : public EditorExportPlatform {
 	}
 
 public:
-	enum {
-		MAX_USER_PERMISSIONS = 20
-	};
-
 	typedef Error (*EditorExportSaveFunction)(void *p_userdata, const String &p_path, const Vector<uint8_t> &p_data, int p_file, int p_total);
 
 public:
@@ -1091,6 +1157,9 @@ public:
 			r_options->push_back(ExportOption(PropertyInfo(Variant::STRING, launcher_icons[i].option_id, PROPERTY_HINT_FILE, "*.png"), ""));
 		}
 
+		r_options->push_back(ExportOption(PropertyInfo(Variant::STRING, "keystore/debug", PROPERTY_HINT_GLOBAL_FILE, "*.keystore"), ""));
+		r_options->push_back(ExportOption(PropertyInfo(Variant::STRING, "keystore/debug_user"), ""));
+		r_options->push_back(ExportOption(PropertyInfo(Variant::STRING, "keystore/debug_password"), ""));
 		r_options->push_back(ExportOption(PropertyInfo(Variant::STRING, "keystore/release", PROPERTY_HINT_GLOBAL_FILE, "*.keystore"), ""));
 		r_options->push_back(ExportOption(PropertyInfo(Variant::STRING, "keystore/release_user"), ""));
 		r_options->push_back(ExportOption(PropertyInfo(Variant::STRING, "keystore/release_password"), ""));
@@ -1105,16 +1174,13 @@ public:
 			r_options->push_back(ExportOption(PropertyInfo(Variant::BOOL, "architectures/" + abi), is_default));
 		}
 
+		r_options->push_back(ExportOption(PropertyInfo(Variant::POOL_STRING_ARRAY, "permissions/custom_permissions"), PoolStringArray()));
+
 		const char **perms = android_perms;
 		while (*perms) {
 
 			r_options->push_back(ExportOption(PropertyInfo(Variant::BOOL, "permissions/" + String(*perms).to_lower()), false));
 			perms++;
-		}
-
-		for (int i = 0; i < MAX_USER_PERMISSIONS; i++) {
-
-			r_options->push_back(ExportOption(PropertyInfo(Variant::STRING, "user_permissions/" + itos(i)), false));
 		}
 	}
 
@@ -1354,12 +1420,15 @@ public:
 			err += "OpenJDK 8 jarsigner not configured in the Editor Settings.\n";
 		}
 
-		String dk = EditorSettings::get_singleton()->get("export/android/debug_keystore");
+		String dk = p_preset->get("keystore/debug");
 
 		if (!FileAccess::exists(dk)) {
 
-			valid = false;
-			err += "Debug keystore not configured in the Editor Settings.\n";
+			dk = EditorSettings::get_singleton()->get("export/android/debug_keystore");
+			if (!FileAccess::exists(dk)) {
+				valid = false;
+				err += "Debug keystore not configured in the Editor Settings nor in the preset.\n";
+			}
 		}
 
 		bool apk_expansion = p_preset->get("apk_expansion/enable");
@@ -1382,12 +1451,23 @@ public:
 			}
 		}
 
+		String pn = p_preset->get("package/unique_name");
+		String pn_err;
+
+		if (!is_package_name_valid(get_package_name(pn), &pn_err)) {
+
+			valid = false;
+			err += "Invalid package name - " + pn_err + "\n";
+		}
+
 		r_error = err;
 		return valid;
 	}
 
-	virtual String get_binary_extension(const Ref<EditorExportPreset> &p_preset) const {
-		return "apk";
+	virtual List<String> get_binary_extensions(const Ref<EditorExportPreset> &p_preset) const {
+		List<String> list;
+		list.push_back("apk");
+		return list;
 	}
 
 	virtual Error export_project(const Ref<EditorExportPreset> &p_preset, bool p_debug, const String &p_path, int p_flags = 0) {
@@ -1490,7 +1570,7 @@ public:
 				_fix_resources(p_preset, data);
 			}
 
-			if (file == "res/drawable/icon.png") {
+			if (file == "res/drawable-nodpi-v4/icon.png") {
 				bool found = false;
 				for (unsigned int i = 0; i < sizeof(launcher_icons) / sizeof(launcher_icons[0]); ++i) {
 					String icon_path = String(p_preset->get(launcher_icons[i].option_id)).strip_edges();
@@ -1698,9 +1778,17 @@ public:
 			String password;
 			String user;
 			if (p_debug) {
-				keystore = EditorSettings::get_singleton()->get("export/android/debug_keystore");
-				password = EditorSettings::get_singleton()->get("export/android/debug_keystore_pass");
-				user = EditorSettings::get_singleton()->get("export/android/debug_keystore_user");
+
+				keystore = p_preset->get("keystore/debug");
+				password = p_preset->get("keystore/debug_password");
+				user = p_preset->get("keystore/debug_user");
+
+				if (keystore.empty()) {
+
+					keystore = EditorSettings::get_singleton()->get("export/android/debug_keystore");
+					password = EditorSettings::get_singleton()->get("export/android/debug_keystore_pass");
+					user = EditorSettings::get_singleton()->get("export/android/debug_keystore_user");
+				}
 
 				ep.step("Signing debug APK...", 103);
 

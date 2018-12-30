@@ -846,9 +846,9 @@ void TextEdit::_notification(int p_what) {
 
 				bool underlined = false;
 
+				Vector<String> wrap_rows = get_wrap_rows_text(line);
 				int line_wrap_amount = times_line_wraps(line);
 				int last_wrap_column = 0;
-				Vector<String> wrap_rows = get_wrap_rows_text(line);
 
 				for (int line_wrap_index = 0; line_wrap_index < line_wrap_amount + 1; line_wrap_index++) {
 					if (line_wrap_index != 0) {
@@ -1108,9 +1108,10 @@ void TextEdit::_notification(int p_what) {
 						if (cursor.column == last_wrap_column + j && cursor.line == line && cursor_wrap_index == line_wrap_index) {
 
 							cursor_pos = Point2i(char_ofs + char_margin + ofs_x, ofs_y);
+							cursor_pos.y += (get_row_height() - cache.font->get_height()) / 2;
 
 							if (insert_mode) {
-								cursor_pos.y += (get_row_height() - 3);
+								cursor_pos.y += (cache.font->get_height() - 3);
 							}
 
 							int caret_w = (str[j] == '\t') ? cache.font->get_char_size(' ').width : char_w;
@@ -1155,7 +1156,8 @@ void TextEdit::_notification(int p_what) {
 #else
 										caret_w = (block_caret) ? caret_w : 2;
 #endif
-										VisualServer::get_singleton()->canvas_item_add_rect(ci, Rect2(cursor_pos, Size2i(caret_w, get_row_height())), cache.caret_color);
+
+										VisualServer::get_singleton()->canvas_item_add_rect(ci, Rect2(cursor_pos, Size2i(caret_w, cache.font->get_height())), cache.caret_color);
 									}
 								}
 							}
@@ -1198,9 +1200,10 @@ void TextEdit::_notification(int p_what) {
 					if (cursor.column == last_wrap_column + str.length() && cursor.line == line && cursor_wrap_index == line_wrap_index && (char_ofs + char_margin) >= xmargin_beg) {
 
 						cursor_pos = Point2i(char_ofs + char_margin + ofs_x, ofs_y);
+						cursor_pos.y += (get_row_height() - cache.font->get_height()) / 2;
 
 						if (insert_mode) {
-							cursor_pos.y += (get_row_height() - 3);
+							cursor_pos.y += (cache.font->get_height() - 3);
 						}
 						if (ime_text.length() > 0) {
 							int ofs = 0;
@@ -1245,7 +1248,8 @@ void TextEdit::_notification(int p_what) {
 #else
 									int caret_w = (block_caret) ? char_w : 2;
 #endif
-									VisualServer::get_singleton()->canvas_item_add_rect(ci, Rect2(cursor_pos, Size2i(caret_w, get_row_height())), cache.caret_color);
+
+									VisualServer::get_singleton()->canvas_item_add_rect(ci, Rect2(cursor_pos, Size2i(caret_w, cache.font->get_height())), cache.caret_color);
 								}
 							}
 						}
@@ -1289,7 +1293,7 @@ void TextEdit::_notification(int p_what) {
 				if (cursor_pos.y + get_row_height() + th > get_size().height) {
 					completion_rect.position.y = cursor_pos.y - th;
 				} else {
-					completion_rect.position.y = cursor_pos.y + get_row_height() + csb->get_offset().y;
+					completion_rect.position.y = cursor_pos.y + get_row_height() + csb->get_offset().y - cache.font->get_height();
 					completion_below = true;
 				}
 
@@ -1323,7 +1327,8 @@ void TextEdit::_notification(int p_what) {
 							text_color = color_regions[j].color;
 						}
 					}
-					draw_string(cache.font, Point2(completion_rect.position.x, completion_rect.position.y + i * get_row_height() + cache.font->get_ascent()), completion_options[l], text_color, completion_rect.size.width);
+					int yofs = (get_row_height() - cache.font->get_height()) / 2;
+					draw_string(cache.font, Point2(completion_rect.position.x, completion_rect.position.y + i * get_row_height() + cache.font->get_ascent() + yofs), completion_options[l], text_color, completion_rect.size.width);
 				}
 
 				if (scrollw) {
@@ -1412,7 +1417,6 @@ void TextEdit::_notification(int p_what) {
 			if (has_focus()) {
 				OS::get_singleton()->set_ime_active(true);
 				OS::get_singleton()->set_ime_position(get_global_position() + cursor_pos + Point2(0, get_row_height()));
-				OS::get_singleton()->set_ime_intermediate_text_callback(_ime_text_callback, this);
 			}
 
 		} break;
@@ -1425,7 +1429,6 @@ void TextEdit::_notification(int p_what) {
 			OS::get_singleton()->set_ime_active(true);
 			Point2 cursor_pos = Point2(cursor_get_column(), cursor_get_line()) * get_row_height();
 			OS::get_singleton()->set_ime_position(get_global_position() + cursor_pos);
-			OS::get_singleton()->set_ime_intermediate_text_callback(_ime_text_callback, this);
 
 			if (OS::get_singleton()->has_virtual_keyboard())
 				OS::get_singleton()->show_virtual_keyboard(get_text(), get_global_rect());
@@ -1433,7 +1436,6 @@ void TextEdit::_notification(int p_what) {
 		case NOTIFICATION_FOCUS_EXIT: {
 
 			OS::get_singleton()->set_ime_position(Point2());
-			OS::get_singleton()->set_ime_intermediate_text_callback(NULL, NULL);
 			OS::get_singleton()->set_ime_active(false);
 			ime_text = "";
 			ime_selection = Point2();
@@ -1441,14 +1443,13 @@ void TextEdit::_notification(int p_what) {
 			if (OS::get_singleton()->has_virtual_keyboard())
 				OS::get_singleton()->hide_virtual_keyboard();
 		} break;
-	}
-}
+		case MainLoop::NOTIFICATION_OS_IME_UPDATE: {
 
-void TextEdit::_ime_text_callback(void *p_self, String p_text, Point2 p_selection) {
-	TextEdit *self = (TextEdit *)p_self;
-	self->ime_text = p_text;
-	self->ime_selection = p_selection;
-	self->update();
+			ime_text = OS::get_singleton()->get_ime_text();
+			ime_selection = OS::get_singleton()->get_ime_selection();
+			update();
+		} break;
+	}
 }
 
 void TextEdit::_consume_pair_symbol(CharType ch) {
@@ -3820,6 +3821,10 @@ Vector<String> TextEdit::get_wrap_rows_text(int p_line) const {
 	// line ends before hit wrap_at; add this word to the substring
 	wrap_substring += word_str;
 	lines.push_back(wrap_substring);
+
+	// update cache
+	text.set_line_wrap_amount(p_line, lines.size() - 1);
+
 	return lines;
 }
 
@@ -4264,6 +4269,7 @@ void TextEdit::_clear() {
 	cursor.line_ofs = 0;
 	cursor.wrap_ofs = 0;
 	cursor.last_fit_x = 0;
+	selection.active = false;
 }
 
 void TextEdit::clear() {
@@ -5757,6 +5763,7 @@ void TextEdit::_update_completion_candidates() {
 	completion_base = s;
 	Vector<float> sim_cache;
 	bool single_quote = s.begins_with("'");
+	Vector<String> completion_options_casei;
 
 	for (int i = 0; i < completion_strings.size(); i++) {
 		if (single_quote && completion_strings[i].is_quoted()) {
@@ -5765,8 +5772,12 @@ void TextEdit::_update_completion_candidates() {
 
 		if (completion_strings[i].begins_with(s)) {
 			completion_options.push_back(completion_strings[i]);
+		} else if (completion_strings[i].to_lower().begins_with(s.to_lower())) {
+			completion_options_casei.push_back(completion_strings[i]);
 		}
 	}
+
+	completion_options.append_array(completion_options_casei);
 
 	if (completion_options.size() == 0) {
 		for (int i = 0; i < completion_strings.size(); i++) {
@@ -6039,7 +6050,10 @@ void TextEdit::menu_option(int p_option) {
 		case MENU_UNDO: {
 			undo();
 		} break;
-	};
+		case MENU_REDO: {
+			redo();
+		}
+	}
 }
 
 void TextEdit::set_select_identifiers_on_hover(bool p_enable) {
@@ -6200,7 +6214,7 @@ void TextEdit::_bind_methods() {
 	ADD_GROUP("Caret", "caret_");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "caret_block_mode"), "cursor_set_block_mode", "cursor_is_block_mode");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "caret_blink"), "cursor_set_blink_enabled", "cursor_get_blink_enabled");
-	ADD_PROPERTYNZ(PropertyInfo(Variant::REAL, "caret_blink_speed", PROPERTY_HINT_RANGE, "0.1,10,0.01"), "cursor_set_blink_speed", "cursor_get_blink_speed");
+	ADD_PROPERTY(PropertyInfo(Variant::REAL, "caret_blink_speed", PROPERTY_HINT_RANGE, "0.1,10,0.01"), "cursor_set_blink_speed", "cursor_get_blink_speed");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "caret_moving_by_right_click"), "set_right_click_moves_caret", "is_right_click_moving_caret");
 
 	ADD_SIGNAL(MethodInfo("cursor_changed"));
@@ -6215,6 +6229,7 @@ void TextEdit::_bind_methods() {
 	BIND_ENUM_CONSTANT(MENU_CLEAR);
 	BIND_ENUM_CONSTANT(MENU_SELECT_ALL);
 	BIND_ENUM_CONSTANT(MENU_UNDO);
+	BIND_ENUM_CONSTANT(MENU_REDO);
 	BIND_ENUM_CONSTANT(MENU_MAX);
 
 	GLOBAL_DEF("gui/timers/text_edit_idle_detect_sec", 3);
@@ -6343,6 +6358,7 @@ TextEdit::TextEdit() {
 	menu->add_item(RTR("Clear"), MENU_CLEAR);
 	menu->add_separator();
 	menu->add_item(RTR("Undo"), MENU_UNDO, KEY_MASK_CMD | KEY_Z);
+	menu->add_item(RTR("Redo"), MENU_REDO, KEY_MASK_CMD | KEY_MASK_SHIFT | KEY_Z);
 	menu->connect("id_pressed", this, "menu_option");
 }
 

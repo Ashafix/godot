@@ -233,7 +233,7 @@ void EditorPropertyPath::_path_pressed() {
 		dialog->set_mode(EditorFileDialog::MODE_OPEN_DIR);
 		dialog->set_current_dir(full_path);
 	} else {
-		dialog->set_mode(EditorFileDialog::MODE_OPEN_FILE);
+		dialog->set_mode(save_mode ? EditorFileDialog::MODE_SAVE_FILE : EditorFileDialog::MODE_OPEN_FILE);
 		for (int i = 0; i < extensions.size(); i++) {
 			String e = extensions[i].strip_edges();
 			if (e != String()) {
@@ -258,6 +258,11 @@ void EditorPropertyPath::setup(const Vector<String> &p_extensions, bool p_folder
 	extensions = p_extensions;
 	folder = p_folder;
 	global = p_global;
+}
+
+void EditorPropertyPath::set_save_mode() {
+
+	save_mode = true;
 }
 
 void EditorPropertyPath::_notification(int p_what) {
@@ -296,6 +301,7 @@ EditorPropertyPath::EditorPropertyPath() {
 	path_edit->connect("pressed", this, "_path_pressed");
 	folder = false;
 	global = false;
+	save_mode = false;
 }
 
 ///////////////////// CLASS NAME /////////////////////////
@@ -1090,6 +1096,8 @@ void EditorPropertyVector2::setup(double p_min, double p_max, double p_step, boo
 		spin[i]->set_max(p_max);
 		spin[i]->set_step(p_step);
 		spin[i]->set_hide_slider(p_no_slider);
+		spin[i]->set_allow_greater(true);
+		spin[i]->set_allow_lesser(true);
 	}
 }
 
@@ -1171,6 +1179,8 @@ void EditorPropertyRect2::setup(double p_min, double p_max, double p_step, bool 
 		spin[i]->set_max(p_max);
 		spin[i]->set_step(p_step);
 		spin[i]->set_hide_slider(p_no_slider);
+		spin[i]->set_allow_greater(true);
+		spin[i]->set_allow_lesser(true);
 	}
 }
 
@@ -1251,6 +1261,8 @@ void EditorPropertyVector3::setup(double p_min, double p_max, double p_step, boo
 		spin[i]->set_max(p_max);
 		spin[i]->set_step(p_step);
 		spin[i]->set_hide_slider(p_no_slider);
+		spin[i]->set_allow_greater(true);
+		spin[i]->set_allow_lesser(true);
 	}
 }
 
@@ -1331,6 +1343,8 @@ void EditorPropertyPlane::setup(double p_min, double p_max, double p_step, bool 
 		spin[i]->set_max(p_max);
 		spin[i]->set_step(p_step);
 		spin[i]->set_hide_slider(p_no_slider);
+		spin[i]->set_allow_greater(true);
+		spin[i]->set_allow_lesser(true);
 	}
 }
 
@@ -1413,6 +1427,8 @@ void EditorPropertyQuat::setup(double p_min, double p_max, double p_step, bool p
 		spin[i]->set_max(p_max);
 		spin[i]->set_step(p_step);
 		spin[i]->set_hide_slider(p_no_slider);
+		spin[i]->set_allow_greater(true);
+		spin[i]->set_allow_lesser(true);
 	}
 }
 
@@ -1500,6 +1516,8 @@ void EditorPropertyAABB::setup(double p_min, double p_max, double p_step, bool p
 		spin[i]->set_max(p_max);
 		spin[i]->set_step(p_step);
 		spin[i]->set_hide_slider(p_no_slider);
+		spin[i]->set_allow_greater(true);
+		spin[i]->set_allow_lesser(true);
 	}
 }
 
@@ -1574,6 +1592,8 @@ void EditorPropertyTransform2D::setup(double p_min, double p_max, double p_step,
 		spin[i]->set_max(p_max);
 		spin[i]->set_step(p_step);
 		spin[i]->set_hide_slider(p_no_slider);
+		spin[i]->set_allow_greater(true);
+		spin[i]->set_allow_lesser(true);
 	}
 }
 
@@ -1653,6 +1673,8 @@ void EditorPropertyBasis::setup(double p_min, double p_max, double p_step, bool 
 		spin[i]->set_max(p_max);
 		spin[i]->set_step(p_step);
 		spin[i]->set_hide_slider(p_no_slider);
+		spin[i]->set_allow_greater(true);
+		spin[i]->set_allow_lesser(true);
 	}
 }
 
@@ -1738,6 +1760,8 @@ void EditorPropertyTransform::setup(double p_min, double p_max, double p_step, b
 		spin[i]->set_max(p_max);
 		spin[i]->set_step(p_step);
 		spin[i]->set_hide_slider(p_no_slider);
+		spin[i]->set_allow_greater(true);
+		spin[i]->set_allow_lesser(true);
 	}
 }
 
@@ -1802,9 +1826,26 @@ void EditorPropertyNodePath::_node_selected(const NodePath &p_path) {
 
 	NodePath path = p_path;
 	Node *base_node = Object::cast_to<Node>(get_edited_object());
-	if (base_node == NULL && get_edited_object()->has_method("get_root_path")) {
+	if (!base_node) {
+		//try a base node within history
+		if (EditorNode::get_singleton()->get_editor_history()->get_path_size() > 0) {
+			Object *base = ObjectDB::get_instance(EditorNode::get_singleton()->get_editor_history()->get_path_object(0));
+			if (base) {
+				base_node = Object::cast_to<Node>(base);
+			}
+		}
+	}
+
+	if (!base_node && get_edited_object()->has_method("get_root_path")) {
 		base_node = get_edited_object()->call("get_root_path");
 	}
+
+	if (!base_node && Object::cast_to<Reference>(get_edited_object())) {
+		Node *to_node = get_node(p_path);
+		ERR_FAIL_COND(!to_node);
+		path = get_tree()->get_edited_scene_root()->get_path_to(to_node);
+	}
+
 	if (base_node) { // for AnimationTrackKeyEdit
 		path = base_node->get_path().rel_path_to(p_path);
 	}
@@ -1915,6 +1956,20 @@ EditorPropertyNodePath::EditorPropertyNodePath() {
 void EditorPropertyResource::_file_selected(const String &p_path) {
 
 	RES res = ResourceLoader::load(p_path);
+
+	List<PropertyInfo> prop_list;
+	get_edited_object()->get_property_list(&prop_list);
+	String type;
+
+	for (List<PropertyInfo>::Element *E = prop_list.front(); E; E = E->next()) {
+		if (E->get().name == get_edited_property() && (E->get().hint & PROPERTY_HINT_RESOURCE_TYPE)) {
+			type = E->get().hint_string;
+		}
+	}
+
+	if (!type.empty() && !res->is_class(type))
+		EditorNode::get_singleton()->show_warning(vformat(TTR("The selected resource (%s) does not match the type expected for this property (%s)."), res->get_class(), type));
+
 	emit_signal("property_changed", get_edited_property(), res);
 	update_property();
 }
@@ -2011,6 +2066,13 @@ void EditorPropertyResource::_menu_option(int p_which) {
 
 		} break;
 
+		case OBJ_MENU_SAVE: {
+			RES res = get_edited_object()->get(get_edited_property());
+			if (res.is_null())
+				return;
+			EditorNode::get_singleton()->save_resource(res);
+		} break;
+
 		case OBJ_MENU_COPY: {
 			RES res = get_edited_object()->get(get_edited_property());
 
@@ -2064,8 +2126,22 @@ void EditorPropertyResource::_menu_option(int p_which) {
 
 			if (intype == "ViewportTexture") {
 
+				Resource *r = Object::cast_to<Resource>(get_edited_object());
+				if (r && r->get_path().is_resource_file()) {
+					EditorNode::get_singleton()->show_warning(TTR("Can't create a ViewportTexture on resources saved as a file.\nResource needs to belong to a scene."));
+					return;
+				}
+
+				if (r && !r->is_local_to_scene()) {
+					EditorNode::get_singleton()->show_warning(TTR("Can't create a ViewportTexture on this resource because it's not set as local to scene.\nPlease switch on the 'local to scene' property on it (and all resources containing it up to a node)."));
+					return;
+				}
+
 				if (!scene_tree) {
 					scene_tree = memnew(SceneTreeDialog);
+					Vector<StringName> valid_types;
+					valid_types.push_back("Viewport");
+					scene_tree->get_scene_tree()->set_valid_types(valid_types);
 					scene_tree->get_scene_tree()->set_show_enabled_subscene(true);
 					add_child(scene_tree);
 					scene_tree->connect("selected", this, "_viewport_selected");
@@ -2126,7 +2202,8 @@ void EditorPropertyResource::_resource_preview(const String &p_path, const Ref<T
 	}
 }
 
-void EditorPropertyResource::_update_menu() {
+void EditorPropertyResource::_update_menu_items() {
+
 	//////////////////// UPDATE MENU //////////////////////////
 	RES res = get_edited_object()->get(get_edited_property());
 
@@ -2213,10 +2290,11 @@ void EditorPropertyResource::_update_menu() {
 		menu->add_icon_item(get_icon("Edit", "EditorIcons"), TTR("Edit"), OBJ_MENU_EDIT);
 		menu->add_icon_item(get_icon("Clear", "EditorIcons"), TTR("Clear"), OBJ_MENU_CLEAR);
 		menu->add_icon_item(get_icon("Duplicate", "EditorIcons"), TTR("Make Unique"), OBJ_MENU_MAKE_UNIQUE);
+		menu->add_icon_item(get_icon("Save", "EditorIcons"), TTR("Save"), OBJ_MENU_SAVE);
 		RES r = res;
 		if (r.is_valid() && r->get_path().is_resource_file()) {
 			menu->add_separator();
-			menu->add_item(TTR("Show in File System"), OBJ_MENU_SHOW_IN_FILE_SYSTEM);
+			menu->add_item(TTR("Show in FileSystem"), OBJ_MENU_SHOW_IN_FILE_SYSTEM);
 		}
 	} else {
 	}
@@ -2268,6 +2346,11 @@ void EditorPropertyResource::_update_menu() {
 			menu->add_icon_item(icon, vformat(TTR("Convert To %s"), what), CONVERT_BASE_ID + i);
 		}
 	}
+}
+
+void EditorPropertyResource::_update_menu() {
+
+	_update_menu_items();
 
 	Rect2 gt = edit->get_global_rect();
 	menu->set_as_minsize();
@@ -2290,6 +2373,20 @@ void EditorPropertyResource::_sub_inspector_resource_selected(const RES &p_resou
 void EditorPropertyResource::_sub_inspector_object_id_selected(int p_id) {
 
 	emit_signal("object_id_selected", get_edited_property(), p_id);
+}
+
+void EditorPropertyResource::_button_input(const Ref<InputEvent> &p_event) {
+	Ref<InputEventMouseButton> mb = p_event;
+	if (mb.is_valid()) {
+		if (mb->is_pressed() && mb->get_button_index() == BUTTON_RIGHT) {
+			_update_menu_items();
+			Vector2 pos = mb->get_global_position();
+			//pos = assign->get_global_transform().xform(pos);
+			menu->set_as_minsize();
+			menu->set_global_position(pos);
+			menu->popup();
+		}
+	}
 }
 
 void EditorPropertyResource::_open_editor_pressed() {
@@ -2324,6 +2421,7 @@ void EditorPropertyResource::update_property() {
 				sub_inspector->set_keying(is_keying());
 				sub_inspector->set_read_only(is_read_only());
 				sub_inspector->set_use_folding(is_using_folding());
+				sub_inspector->set_undo_redo(EditorNode::get_singleton()->get_undo_redo());
 
 				sub_inspector_vbox = memnew(VBoxContainer);
 				add_child(sub_inspector_vbox);
@@ -2579,6 +2677,7 @@ void EditorPropertyResource::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("drop_data_fw"), &EditorPropertyResource::drop_data_fw);
 	ClassDB::bind_method(D_METHOD("_button_draw"), &EditorPropertyResource::_button_draw);
 	ClassDB::bind_method(D_METHOD("_open_editor_pressed"), &EditorPropertyResource::_open_editor_pressed);
+	ClassDB::bind_method(D_METHOD("_button_input"), &EditorPropertyResource::_button_input);
 }
 
 EditorPropertyResource::EditorPropertyResource() {
@@ -2605,6 +2704,7 @@ EditorPropertyResource::EditorPropertyResource() {
 	preview->set_margin(MARGIN_BOTTOM, -1);
 	preview->set_margin(MARGIN_RIGHT, -1);
 	assign->add_child(preview);
+	assign->connect("gui_input", this, "_button_input");
 
 	menu = memnew(PopupMenu);
 	add_child(menu);
@@ -2613,6 +2713,7 @@ EditorPropertyResource::EditorPropertyResource() {
 	menu->connect("id_pressed", this, "_menu_option");
 	edit->connect("pressed", this, "_update_menu");
 	hbc->add_child(edit);
+	edit->connect("gui_input", this, "_button_input");
 
 	file = NULL;
 	scene_tree = NULL;
@@ -3034,7 +3135,7 @@ bool EditorInspectorDefaultPlugin::parse_property(Object *p_object, Variant::Typ
 		} break;
 		case Variant::ARRAY: {
 			EditorPropertyArray *editor = memnew(EditorPropertyArray);
-			editor->setup(Variant::ARRAY);
+			editor->setup(Variant::ARRAY, p_hint_text);
 			add_property_editor(p_path, editor);
 		} break;
 		case Variant::POOL_BYTE_ARRAY: {

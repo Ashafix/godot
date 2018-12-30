@@ -76,6 +76,13 @@
 #define NSWindowStyleMaskBorderless NSBorderlessWindowMask
 #endif
 
+#ifndef NSAppKitVersionNumber10_12
+#define NSAppKitVersionNumber10_12 1504
+#endif
+#ifndef NSAppKitVersionNumber10_14
+#define NSAppKitVersionNumber10_14 1671
+#endif
+
 static void get_key_modifier_state(unsigned int p_osx_state, Ref<InputEventWithModifiers> state) {
 
 	state->set_shift((p_osx_state & NSEventModifierFlagShift));
@@ -326,15 +333,15 @@ static Vector2 get_mouse_pos(NSPoint locationInWindow, CGFloat backingScaleFacto
 - (void)windowDidBecomeKey:(NSNotification *)notification {
 	//_GodotInputWindowFocus(window, GL_TRUE);
 	//_GodotPlatformSetCursorMode(window, window->cursorMode);
-	[OS_OSX::singleton->context update];
 
-	get_mouse_pos(
-			[OS_OSX::singleton->window_object mouseLocationOutsideOfEventStream],
-			[OS_OSX::singleton->window_view backingScaleFactor]);
-	OS_OSX::singleton->input->set_mouse_position(Point2(mouse_x, mouse_y));
+	if (OS_OSX::singleton->get_main_loop()) {
+		get_mouse_pos(
+				[OS_OSX::singleton->window_object mouseLocationOutsideOfEventStream],
+				[OS_OSX::singleton->window_view backingScaleFactor]);
+		OS_OSX::singleton->input->set_mouse_position(Point2(mouse_x, mouse_y));
 
-	if (OS_OSX::singleton->get_main_loop())
 		OS_OSX::singleton->get_main_loop()->notification(MainLoop::NOTIFICATION_WM_FOCUS_IN);
+	}
 }
 
 - (void)windowDidResignKey:(NSNotification *)notification {
@@ -364,6 +371,8 @@ static Vector2 get_mouse_pos(NSPoint locationInWindow, CGFloat backingScaleFacto
 	bool imeMode;
 }
 - (void)cancelComposition;
+- (BOOL)wantsUpdateLayer;
+- (void)updateLayer;
 @end
 
 @implementation GodotContentView
@@ -372,6 +381,14 @@ static Vector2 get_mouse_pos(NSPoint locationInWindow, CGFloat backingScaleFacto
 	if (self == [GodotContentView class]) {
 		// nothing left to do here at the moment..
 	}
+}
+
+- (BOOL)wantsUpdateLayer {
+	return YES;
+}
+
+- (void)updateLayer {
+	[OS_OSX::singleton->context update];
 }
 
 - (id)init {
@@ -410,11 +427,13 @@ static const NSRange kEmptyRange = { NSNotFound, 0 };
 	} else {
 		[markedText initWithString:aString];
 	}
-	if (OS_OSX::singleton->im_callback) {
+	if (OS_OSX::singleton->im_active) {
 		imeMode = true;
-		String ret;
-		ret.parse_utf8([[markedText mutableString] UTF8String]);
-		OS_OSX::singleton->im_callback(OS_OSX::singleton->im_target, ret, Point2(selectedRange.location, selectedRange.length));
+		OS_OSX::singleton->im_text.parse_utf8([[markedText mutableString] UTF8String]);
+		OS_OSX::singleton->im_selection = Point2(selectedRange.location, selectedRange.length);
+
+		if (OS_OSX::singleton->get_main_loop())
+			OS_OSX::singleton->get_main_loop()->notification(MainLoop::NOTIFICATION_OS_IME_UPDATE);
 	}
 }
 
@@ -426,8 +445,13 @@ static const NSRange kEmptyRange = { NSNotFound, 0 };
 - (void)unmarkText {
 	imeMode = false;
 	[[markedText mutableString] setString:@""];
-	if (OS_OSX::singleton->im_callback)
-		OS_OSX::singleton->im_callback(OS_OSX::singleton->im_target, "", Point2());
+	if (OS_OSX::singleton->im_active) {
+		OS_OSX::singleton->im_text = String();
+		OS_OSX::singleton->im_selection = Point2();
+
+		if (OS_OSX::singleton->get_main_loop())
+			OS_OSX::singleton->get_main_loop()->notification(MainLoop::NOTIFICATION_OS_IME_UPDATE);
+	}
 }
 
 - (NSArray *)validAttributesForMarkedText {
@@ -933,7 +957,7 @@ static int remapKey(unsigned int key) {
 
 	CFDataRef layoutData = (CFDataRef)TISGetInputSourceProperty(currentKeyboard, kTISPropertyUnicodeKeyLayoutData);
 	if (!layoutData)
-		return 0;
+		return translateKey(key);
 
 	const UCKeyboardLayout *keyboardLayout = (const UCKeyboardLayout *)CFDataGetBytePtr(layoutData);
 
@@ -1051,6 +1075,8 @@ static int remapKey(unsigned int key) {
 
 inline void sendScrollEvent(int button, double factor, int modifierFlags) {
 
+	unsigned int mask = 1 << (button - 1);
+
 	Ref<InputEventMouseButton> sc;
 	sc.instance();
 
@@ -1061,9 +1087,13 @@ inline void sendScrollEvent(int button, double factor, int modifierFlags) {
 	Vector2 mouse_pos = Vector2(mouse_x, mouse_y);
 	sc->set_position(mouse_pos);
 	sc->set_global_position(mouse_pos);
+	button_mask |= mask;
 	sc->set_button_mask(button_mask);
 	OS_OSX::singleton->push_input(sc);
+
 	sc->set_pressed(false);
+	button_mask &= ~mask;
+	sc->set_button_mask(button_mask);
 	OS_OSX::singleton->push_input(sc);
 }
 
@@ -1119,12 +1149,14 @@ inline void sendPanEvent(double dx, double dy, int modifierFlags) {
 
 @end
 
-void OS_OSX::set_ime_intermediate_text_callback(ImeCallback p_callback, void *p_inp) {
-	im_callback = p_callback;
-	im_target = p_inp;
-	if (!im_callback) {
-		[window_view cancelComposition];
-	}
+Point2 OS_OSX::get_ime_selection() const {
+
+	return im_selection;
+}
+
+String OS_OSX::get_ime_text() const {
+
+	return im_text;
 }
 
 String OS_OSX::get_unique_id() const {
@@ -1152,10 +1184,14 @@ String OS_OSX::get_unique_id() const {
 }
 
 void OS_OSX::set_ime_active(const bool p_active) {
+
 	im_active = p_active;
+	if (!im_active)
+		[window_view cancelComposition];
 }
 
 void OS_OSX::set_ime_position(const Point2 &p_pos) {
+
 	im_position = p_pos;
 }
 
@@ -1227,6 +1263,9 @@ Error OS_OSX::initialize(const VideoMode &p_desired, int p_video_driver, int p_a
 	ERR_FAIL_COND_V(window_object == nil, ERR_UNAVAILABLE);
 
 	window_view = [[GodotContentView alloc] init];
+	if (NSAppKitVersionNumber >= NSAppKitVersionNumber10_14) {
+		[window_view setWantsLayer:TRUE];
+	}
 
 	float displayScale = 1.0;
 	if (is_hidpi_allowed()) {
@@ -1384,7 +1423,6 @@ Error OS_OSX::initialize(const VideoMode &p_desired, int p_video_driver, int p_a
 
 	visual_server = memnew(VisualServerRaster);
 	if (get_render_thread_mode() != RENDER_THREAD_UNSAFE) {
-
 		visual_server = memnew(VisualServerWrapMT(visual_server, get_render_thread_mode() == RENDER_SEPARATE_THREAD));
 	}
 
@@ -1460,7 +1498,7 @@ public:
 
 		switch (p_type) {
 			case ERR_WARNING:
-				if (floor(NSAppKitVersionNumber) >= NSAppKitVersionNumber10_12) {
+				if (NSAppKitVersionNumber >= NSAppKitVersionNumber10_12) {
 					os_log_info(OS_LOG_DEFAULT,
 							"WARNING: %{public}s: %{public}s\nAt: %{public}s:%i.",
 							p_function, err_details, p_file, p_line);
@@ -1470,7 +1508,7 @@ public:
 				logf_error("\E[0;33m   At: %s:%i.\E[0m\n", p_file, p_line);
 				break;
 			case ERR_SCRIPT:
-				if (floor(NSAppKitVersionNumber) >= NSAppKitVersionNumber10_12) {
+				if (NSAppKitVersionNumber >= NSAppKitVersionNumber10_12) {
 					os_log_error(OS_LOG_DEFAULT,
 							"SCRIPT ERROR: %{public}s: %{public}s\nAt: %{public}s:%i.",
 							p_function, err_details, p_file, p_line);
@@ -1480,7 +1518,7 @@ public:
 				logf_error("\E[0;35m   At: %s:%i.\E[0m\n", p_file, p_line);
 				break;
 			case ERR_SHADER:
-				if (floor(NSAppKitVersionNumber) >= NSAppKitVersionNumber10_12) {
+				if (NSAppKitVersionNumber >= NSAppKitVersionNumber10_12) {
 					os_log_error(OS_LOG_DEFAULT,
 							"SHADER ERROR: %{public}s: %{public}s\nAt: %{public}s:%i.",
 							p_function, err_details, p_file, p_line);
@@ -1491,7 +1529,7 @@ public:
 				break;
 			case ERR_ERROR:
 			default:
-				if (floor(NSAppKitVersionNumber) >= NSAppKitVersionNumber10_12) {
+				if (NSAppKitVersionNumber >= NSAppKitVersionNumber10_12) {
 					os_log_error(OS_LOG_DEFAULT,
 							"ERROR: %{public}s: %{public}s\nAt: %{public}s:%i.",
 							p_function, err_details, p_file, p_line);
@@ -2162,11 +2200,7 @@ void OS_OSX::set_window_size(const Size2 p_size) {
 		if (menuBarHeight != 0.f) {
 			size.y += menuBarHeight;
 		} else {
-#if MAC_OS_X_VERSION_MAX_ALLOWED >= 101200
 			if (floor(NSAppKitVersionNumber) < NSAppKitVersionNumber10_12) {
-#else
-			{
-#endif
 				size.y += [[NSStatusBar systemStatusBar] thickness];
 			}
 		}
@@ -2622,8 +2656,6 @@ OS_OSX::OS_OSX() {
 	singleton = this;
 	im_active = false;
 	im_position = Point2();
-	im_callback = NULL;
-	im_target = NULL;
 	layered_window = false;
 	autoreleasePool = [[NSAutoreleasePool alloc] init];
 
