@@ -33,7 +33,7 @@ class Voronoi : public Reference
 		
 		void voronoi2d_in_box(Array bounding_points, int n_points);
 		void voronoi2d(int n_points);
-		void voronoi3d_in_box(PoolVector3Array bounding_points, int n_points);
+		void voronoi3d_in_box(Array bounding_points, int n_points);
 		void voronoi3d(int n_points);
 		Dictionary get_vertexes();
 		Array get_faces();

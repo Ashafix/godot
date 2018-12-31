@@ -107,7 +107,6 @@ void Voronoi::voronoi_in_box(Array bounding_points, int n_points, int n_dim) {
 	//adjust/mirror the points
 	std::vector<double> offset = std::vector<double>();
 	std::vector<int> prefix = std::vector<int>();
-	
 
 	//TODO move to lower loop
 	for (int i = 0; i < n_dim; ++i) {
@@ -142,18 +141,19 @@ void Voronoi::voronoi_in_box(Array bounding_points, int n_points, int n_dim) {
 	std::stringstream output;
 	qhull.setOutputStream(&output);
 
+	qhull.runQhull(rbox, "v Qbb");
 	if (n_dim == 2) {
-		qhull.runQhull(rbox, "v Qbb");
 		qhull.outputQhull("p");
 		qhull.outputQhull("FN");
 		Voronoi::parse_output2d(output, val_min[0], val_max[0], val_min[1], val_max[1]);
-	} else {
+	} else if (n_dim == 3) {
+		qhull.outputQhull("o");
 		Voronoi::parse_output3d(output, val_min[0], val_max[0], val_min[1], val_max[1], val_min[2], val_max[2]);
 	}
 }
 
 void Voronoi::voronoi3d(int n_points) {
-	PoolVector3Array bounding_points = PoolVector3Array();
+	Array bounding_points = Array();
 	bounding_points.append(Vector3(0, 0, 0));
 	bounding_points.append(Vector3(1, 0, 0));
 	bounding_points.append(Vector3(1, 1, 0));
@@ -165,95 +165,8 @@ void Voronoi::voronoi3d(int n_points) {
 	Voronoi::voronoi3d_in_box(bounding_points, n_points);
 }
 
-void Voronoi::voronoi3d_in_box(PoolVector3Array bounding_points, int n_points) {
-
-	int precision = std::numeric_limits<double>::digits10 + 1;
-	int dim = 3;
-	int size = bounding_points.size();
-
-	//get min/max values of bounding box
-	double min_x = bounding_points[0].x;
-	double min_y = bounding_points[0].y;
-	double min_z = bounding_points[0].z;
-	double max_x = bounding_points[0].x;
-	double max_y = bounding_points[0].y;
-	double max_z = bounding_points[0].z;
-
-	for (int i = 0; i < size; ++i) {
-		if (bounding_points[i].x > max_x) {
-			max_x = bounding_points[i].x;
-		} else if (bounding_points[i].x < min_x) {
-			min_x = bounding_points[i].x;
-		}
-		if (bounding_points[i].y > max_y) {
-			max_y = bounding_points[i].y;
-		} else if (bounding_points[i].y < min_y) {
-			min_y = bounding_points[i].y;
-		}
-		if (bounding_points[i].z > max_z) {
-			max_z = bounding_points[i].z;
-		} else if (bounding_points[i].z < min_z) {
-			min_z = bounding_points[i].z;
-		}
-	}
-
-	//create some random points inside the bounding box
-	std::vector<double> points = generate_random_points3d(n_points, min_x, max_x, min_y, max_y, min_z, max_z);
-	//assign the random points to the vector
-	std::vector<double> all_points(n_points * dim * (dim * 2 + 1));
-	for (int i = 0; i < n_points; ++i) {
-		for (int d = 0; d < dim; ++d) {
-			all_points[i * dim + d] = points[i + d];
-		}
-	}
-	
-
-	//adjust/mirror the points
-	//TODO put it in an elegant loop
-	for (int i = 0; i < n_points; ++i) {
-		//left mirror
-		all_points[3 * n_points * 1 + i * 3] = 2 * min_x - all_points[i * 3];
-		all_points[3 * n_points * 1 + i * 3 + 1] = all_points[i * 3 + 1];
-		all_points[3 * n_points * 1 + i * 3 + 2] = all_points[i * 3 + 2];
-		//right mirror
-		all_points[3 * n_points * 2 + i * 3] = 2 * max_x - all_points[i * 3];
-		all_points[3 * n_points * 2 + i * 3 + 1] = all_points[i * 3 + 1];
-		all_points[3 * n_points * 2 + i * 3 + 2] = all_points[i * 3 + 2];
-		//top mirror
-		all_points[3 * n_points * 3 + i * 3] = all_points[i * 3];
-		all_points[3 * n_points * 3 + i * 3 + 1] = 2 * min_y - all_points[i * 3 + 1];
-		all_points[3 * n_points * 3 + i * 3 + 2] = all_points[i * 3 + 2];
-		//bottom mirror
-		all_points[3 * n_points * 4 + i * 3] = all_points[i * 3];
-		all_points[3 * n_points * 4 + i * 3 + 1] = 2 * max_y - all_points[i * 3 + 1];
-		all_points[3 * n_points * 4 + i * 3 + 2] = all_points[i * 3 + 2];
-		//up mirror
-		all_points[3 * n_points * 5 + i * 3] = all_points[i * 3];
-		all_points[3 * n_points * 5 + i * 3 + 1] = all_points[i * 3 + 1];
-		all_points[3 * n_points * 5 + i * 3 + 2] = 2 * min_z - all_points[i * 3 + 2];
-		//down mirror
-		all_points[3 * n_points * 6 + i * 3] = all_points[i * 3];
-		all_points[3 * n_points * 6 + i * 3 + 1] = all_points[i * 3 + 1];
-		all_points[3 * n_points * 6 + i * 3 + 2] = 2 * max_z - all_points[i * 3 + 2];
-	}
-
-	orgQhull::RboxPoints rbox;
-
-	std::stringstream stringStream;
-
-	stringStream << "3 " << 7 * n_points << "\n";
-	for (size_t i = 0; i < all_points.size(); i += 3) {
-		stringStream << std::setprecision(precision) << all_points[i] << " " << std::setprecision(precision) << all_points[i + 1] << " " << std::setprecision(precision) << all_points[i + 2] << "\n";
-	}
-	std::istringstream iStringStream(stringStream.str());
-	rbox.appendPoints(iStringStream);
-	orgQhull::Qhull qhull;
-	std::stringstream output;
-	qhull.setOutputStream(&output);
-	qhull.runQhull(rbox, "v Qbb");
-	qhull.outputQhull("o");
-
-	Voronoi::parse_output3d(output, min_x, max_x, min_y, max_y, min_z, max_z);
+void Voronoi::voronoi3d_in_box(Array bounding_points, int n_points) {
+	Voronoi::voronoi_in_box(bounding_points, n_points, 3);
 }
 
 void Voronoi::parse_output2d(std::stringstream &output, const double &min_x, const double &max_x, const double &min_y, const double &max_y) {
