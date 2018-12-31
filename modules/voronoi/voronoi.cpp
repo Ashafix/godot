@@ -88,9 +88,12 @@ void Voronoi::get_boundaries(Array const &bounding_points, int const &n_dim, std
 }
 
 void Voronoi::voronoi2d_in_box(Array bounding_points, int n_points) {
+	Voronoi::voronoi_in_box(bounding_points, n_points, 2);
+}
+
+void Voronoi::voronoi_in_box(Array bounding_points, int n_points, int n_dim) {
 	int precision = std::numeric_limits<double>::digits10 + 1;
-	int n_dim = 2;
-	
+
 	std::vector<double> val_min;
 	std::vector<double> val_max;
 	Voronoi::get_boundaries(bounding_points, n_dim, val_min, val_max);
@@ -121,31 +124,28 @@ void Voronoi::voronoi2d_in_box(Array bounding_points, int n_points) {
 		}
 	}
 
-	orgQhull::RboxPoints rbox;
-
 	std::stringstream stringStream;
 
-	stringStream << n_dim << " " << (2 * n_dim + 1) * n_points << "\n";
+	stringStream << n_dim << " " << (2 * n_dim + 1) * n_points;
 	for (size_t i = 0; i < all_points.size(); i += n_dim) {
-		for (size_t d = 0; d < n_dim - 1; ++d)
+		stringStream << "\n";
+		for (size_t d = 0; d < n_dim; ++d)
 		{
 			stringStream << std::setprecision(precision) << all_points[i + d] << " ";
 		}
-		stringStream << std::setprecision(precision) << all_points[i + n_dim - 1] << "\n";
-		
 	}
+	orgQhull::RboxPoints rbox;
 	std::istringstream iStringStream(stringStream.str());
-
 	rbox.appendPoints(std::istringstream(stringStream.str()));
 	
 	orgQhull::Qhull qhull;
 	std::stringstream output;
 	qhull.setOutputStream(&output);
-	qhull.runQhull(rbox, "v Qbb");
-	qhull.outputQhull("p");
-	qhull.outputQhull("FN");
-	
+
 	if (n_dim == 2) {
+		qhull.runQhull(rbox, "v Qbb");
+		qhull.outputQhull("p");
+		qhull.outputQhull("FN");
 		Voronoi::parse_output2d(output, val_min[0], val_max[0], val_min[1], val_max[1]);
 	} else {
 		Voronoi::parse_output3d(output, val_min[0], val_max[0], val_min[1], val_max[1], val_min[2], val_max[2]);
@@ -266,7 +266,7 @@ void Voronoi::parse_output2d(std::stringstream &output, const double &min_x, con
 	int line_counter = 0;
 
 	bool good_vertex;
-
+	
 	output.seekg(0);
 	// output has the following format: Dimension\nNumberOfFaces\nFaces\nNumberOfVertexes\nVertexes
 	for (std::string line; std::getline(output, line);) {
@@ -276,12 +276,22 @@ void Voronoi::parse_output2d(std::stringstream &output, const double &min_x, con
 			n_points = atoi(line.c_str());
 			good_vertexes.reserve(n_points);
 		} else if (line_counter == n_points + 2) {
-			// 2nd header states number of faces	
+			// 2nd header states number of faces
 			n_faces = atoi(line.c_str());
 			vectfaces = std::vector<std::vector<int> >(n_faces);
 		} else if (line_counter > 1 && line_counter < n_points + 2) {
 			// parse points
-			int space_pos = line.find(' ');
+			int space_pos = line.find(" ");
+
+			// sometimes there are trailing spaces in the QHull output which we need to skip
+			if (space_pos == 0) {
+				space_pos = 1;
+				while (line.substr(space_pos, 1) == " ") {
+					space_pos += 1;
+				}
+				line = line.substr(space_pos);
+				space_pos = line.find(" ");
+			}
 
 			double x = atof(line.substr(0, space_pos).c_str());
 			double y = atof(line.substr(space_pos).c_str());
@@ -298,7 +308,7 @@ void Voronoi::parse_output2d(std::stringstream &output, const double &min_x, con
 			int offset = 0;
 			int vect_index = line_counter - 3 - n_points;
 			while (pos > -1) {
-				pos = line.substr(offset).find(' ');
+				pos = line.substr(offset).find(" ");
 				int value = atoi(line.substr(offset, pos).c_str());
 
 				if (offset == 0) {
@@ -318,17 +328,16 @@ void Voronoi::parse_output2d(std::stringstream &output, const double &min_x, con
 	bool good_face;
 	for (int i = 0; i < n_faces; ++i) {
 		good_face = True;
+		Array cur_face = Array();
 		for (int j = 0; j < vectfaces[i].size(); ++j) {
 			if (!good_vertexes[std::abs(vectfaces[i][j])]) {
-				good_face = False;
+				good_face = false;
 				break;
 			}
+			cur_face.append(std::abs(vectfaces[i][j]));
 		}
+
 		if (good_face) {
-			Array cur_face = Array();
-			for (int j = 0; j < vectfaces[i].size(); ++j) {
-				cur_face.append(vectfaces[i][j]);
-			}
 			faces.append(cur_face);
 		}
 	}
@@ -352,20 +361,20 @@ void Voronoi::parse_output3d(std::stringstream &output, const double &min_x, con
 	for (std::string line; std::getline(output, line);) {
 		std::string::size_type pos = 0;
 		if (line_counter == 1) {
-			pos = line.find(' ');
+			pos = line.find(" ");
 			n_points = atoi(line.substr(0, pos).c_str());
 			n_faces = atoi(line.substr(pos + 1).c_str());
 			vectfaces = std::vector<std::vector<int> >(n_faces);
 
 		} else if (line_counter > 1 && line_counter < n_points + 2) {
-			pos = line.find(' ');
+			pos = line.find(" ");
 			int offset = 0;
 			double x = atof(line.substr(0, pos).c_str());
 			offset += pos + 1;
-			pos = line.substr(offset).find(' ');
+			pos = line.substr(offset).find(" ");
 			double y = atof(line.substr(offset, pos).c_str());
 			offset += pos + 1;
-			pos = line.substr(offset).find(' ');
+			pos = line.substr(offset).find(" ");
 			double z = atof(line.substr(offset, pos).c_str());
 			good_vertex = (x >= min_x - epsilon && x <= max_x + epsilon && y >= min_y - epsilon && y <= max_y + epsilon && z >= min_z - epsilon && z <= max_z + epsilon);
 			good_vertexes.push_back(good_vertex);
@@ -380,7 +389,7 @@ void Voronoi::parse_output3d(std::stringstream &output, const double &min_x, con
 			int offset = 0;
 			int pos = 0;
 			while (pos > -1) {
-				pos = line.substr(offset).find(' ');
+				pos = line.substr(offset).find(" ");
 				int value = atoi(line.substr(offset, pos).c_str());
 
 				if (offset == 0) {
@@ -439,13 +448,13 @@ void Voronoi::parse_output3d(std::stringstream &output, const double &min_x, con
 				} else {
 					std::string::size_type offset = 0;
 					std::string::size_type pos = 0;
-					pos = line.find(' ');
+					pos = line.find(" ");
 					int a = atoi(line.substr(offset, pos).c_str());
 					offset += pos + 1;
-					pos = line.substr(offset).find(' ');
+					pos = line.substr(offset).find(" ");
 					int b = atoi(line.substr(offset, pos).c_str());
 					offset += pos + 1;
-					pos = line.substr(offset).find(' ');
+					pos = line.substr(offset).find(" ");
 					int c = atoi(line.substr(offset, pos).c_str());
 
 					Array p = Array();

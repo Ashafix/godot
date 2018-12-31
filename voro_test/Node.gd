@@ -1,19 +1,8 @@
 extends Node
 
 func _ready():
+	performance_test()
 	var voro = Voronoi.new()
-	#voro.voronoi2d(5)
-	#print(voro.get_faces())
-	#print(voro.get_vertexes())
-	#return 
-	#voro.voronoi3d(25)
-	#print(voro.get_faces())
-	#print(voro.get_fragments())
-	
-	#performance_test()
-	
-	#var voro = Voronoi.new()
-	
 	voro.voronoi3d(10)
 	var vertexes = voro.get_vertexes()
 	var fragments = voro.get_fragments()

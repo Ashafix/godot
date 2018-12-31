@@ -6,12 +6,10 @@ func _physics_process(delta):
 	if shattered:
 		return
 	var move = move_and_collide(Vector3(0, -0.1, 0))
-	
+
 	if move:
-			
 		shattered = true
 		print('baammm')
-		#return
 		var new_node = get_node('../FragmentNode')
 		new_node.transform.translated(self.transform.origin)
 		get_node('CollisionShape').disabled = true
