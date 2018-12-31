@@ -56,11 +56,6 @@ std::vector<double> Voronoi::generate_random_points(const int n_points, const in
 }
 
 void Voronoi::voronoi2d(int n_points) {
-	std::ofstream myfile;
-
-	myfile.open("voronoi2d_dim.txt");
-	myfile << ";" << n_points << ";";
-	myfile.close();
 	Array bounding_points = Array();
 	bounding_points.append(Vector2(0, 0));
 	bounding_points.append(Vector2(1, 0));
@@ -95,15 +90,7 @@ void Voronoi::get_boundaries(Array const &bounding_points, int const &n_dim, std
 void Voronoi::voronoi2d_in_box(Array bounding_points, int n_points) {
 	int precision = std::numeric_limits<double>::digits10 + 1;
 	int n_dim = 2;
-	std::ofstream myfile;
-
-	myfile.open("dim.txt");
-	myfile << n_dim << ";" << n_points << ";" << (2 * n_dim + 1) * n_points;
-	myfile.close();
-
-
 	
-
 	std::vector<double> val_min;
 	std::vector<double> val_max;
 	Voronoi::get_boundaries(bounding_points, n_dim, val_min, val_max);
@@ -139,15 +126,15 @@ void Voronoi::voronoi2d_in_box(Array bounding_points, int n_points) {
 	std::stringstream stringStream;
 
 	stringStream << n_dim << " " << (2 * n_dim + 1) * n_points << "\n";
-	for (size_t i = 0; i < all_points.size(); i += 2) {
-		stringStream << std::setprecision(precision) << all_points[i] << ' ' << std::setprecision(precision) << all_points[i + 1] << "\n";
+	for (size_t i = 0; i < all_points.size(); i += n_dim) {
+		for (size_t d = 0; d < n_dim - 1; ++d)
+		{
+			stringStream << std::setprecision(precision) << all_points[i + d] << " ";
+		}
+		stringStream << std::setprecision(precision) << all_points[i + n_dim - 1] << "\n";
+		
 	}
 	std::istringstream iStringStream(stringStream.str());
-
-	
-	myfile.open("output_qhull.txt");
-	myfile << iStringStream.rdbuf();
-	myfile.close();
 
 	rbox.appendPoints(std::istringstream(stringStream.str()));
 	
@@ -254,12 +241,11 @@ void Voronoi::voronoi3d_in_box(PoolVector3Array bounding_points, int n_points) {
 
 	std::stringstream stringStream;
 
-	stringStream << "3 " << 7 * n_points;
-	for (size_t i = 0; i < all_points.size(); ++i) {
-		stringStream << ' ' << std::setprecision(precision) << all_points[i];
+	stringStream << "3 " << 7 * n_points << "\n";
+	for (size_t i = 0; i < all_points.size(); i += 3) {
+		stringStream << std::setprecision(precision) << all_points[i] << " " << std::setprecision(precision) << all_points[i + 1] << " " << std::setprecision(precision) << all_points[i + 2] << "\n";
 	}
 	std::istringstream iStringStream(stringStream.str());
-
 	rbox.appendPoints(iStringStream);
 	orgQhull::Qhull qhull;
 	std::stringstream output;
@@ -282,27 +268,6 @@ void Voronoi::parse_output2d(std::stringstream &output, const double &min_x, con
 	bool good_vertex;
 
 	output.seekg(0);
-
-	std::ofstream myfile;
-	myfile.open("parse_output_qhull.txt");
-	myfile << output.rdbuf();
-	myfile.close();
-
-	myfile.open("input.txt");
-	myfile << min_x << "\n";
-	myfile << max_x << "\n";
-	myfile << min_y << "\n";
-	myfile << max_y << "\n";
-	myfile.close();
-
-	myfile.open("parsed_points.txt");
-	myfile << "huh?!?\n";
-	/*
-	output.seekg(0);
-
-
-	
-
 	// output has the following format: Dimension\nNumberOfFaces\nFaces\nNumberOfVertexes\nVertexes
 	for (std::string line; std::getline(output, line);) {
 
@@ -320,11 +285,9 @@ void Voronoi::parse_output2d(std::stringstream &output, const double &min_x, con
 
 			double x = atof(line.substr(0, space_pos).c_str());
 			double y = atof(line.substr(space_pos).c_str());
-			myfile << x << ";" << y << "\n";
 
 			good_vertex = (x >= min_x - epsilon && x <= max_x + epsilon && y >= min_y - epsilon && y <= max_y + epsilon);
 			good_vertexes.push_back(good_vertex);
-			myfile << good_vertex << "\n";
 
 			if (good_vertex) {
 				vertexes[line_counter - 2] = Vector2(x, y);
@@ -338,7 +301,7 @@ void Voronoi::parse_output2d(std::stringstream &output, const double &min_x, con
 				pos = line.substr(offset).find(' ');
 				int value = atoi(line.substr(offset, pos).c_str());
 
-				if (pos == 0) {
+				if (offset == 0) {
 					vectfaces[vect_index] = std::vector<int>();
 					vectfaces[vect_index].reserve(value);
 				} else {
@@ -350,66 +313,13 @@ void Voronoi::parse_output2d(std::stringstream &output, const double &min_x, con
 		line_counter++;
 	}
 
-	
-
-	myfile.open("parsed.txt");
-	myfile << "n_points: " << n_points << "\n" << "n_faces: " << n_faces << ";\n";
-	myfile.close();
-
-	*/
-
-
-	std::string buff{ "" };
-//output.seekg(0);
-	myfile << output.str() << "\n";
-	for (auto n : output.str()) {
-		if (n != '\n') {
-			buff += n;
-		} else {
-			if (line_counter == 1) {
-				n_points = atoi(buff.c_str());
-				good_vertexes.reserve(n_points);
-			} else if (line_counter == n_points + 2) {
-				n_faces = atoi(buff.c_str());
-				vectfaces = std::vector<std::vector<int> >(n_faces);
-			} else if (line_counter > 1 && line_counter < n_points + 2) {
-				std::string::size_type sz;
-				double x = std::stod(buff, &sz);
-				double y = std::stod(buff.substr(sz));
-				good_vertex = (x >= min_x - epsilon && x <= max_x + epsilon && y >= min_y - epsilon && y <= max_y + epsilon);
-				good_vertexes.push_back(good_vertex);
-				myfile << good_vertex << "\n";
-				if (good_vertex) {
-					vertexes[line_counter - 2] = Vector2(x, y);
-				}
-			} else if (line_counter > (n_points + 1)) {
-				std::string::size_type sz;
-				std::string::size_type pos = 0;
-				int vect_index = line_counter - 3 - n_points;
-				while (pos < buff.size() - 1) {
-					int value = std::stoi(buff.substr(pos), &sz);
-
-					if (pos == 0) {
-						vectfaces[vect_index] = std::vector<int>();
-					} else {
-						vectfaces[vect_index].push_back(value);
-					}
-					pos += sz;
-					}
-				line_counter++;
-			}
-		}
-	}
-
-	myfile.close();
-
 	faces = Array();
 
 	bool good_face;
 	for (int i = 0; i < n_faces; ++i) {
 		good_face = True;
 		for (int j = 0; j < vectfaces[i].size(); ++j) {
-			if (!good_vertexes[vectfaces[i][j]]) {
+			if (!good_vertexes[std::abs(vectfaces[i][j])]) {
 				good_face = False;
 				break;
 			}
@@ -488,7 +398,7 @@ void Voronoi::parse_output3d(std::stringstream &output, const double &min_x, con
 	faces = Array();
 	fragments = Array();
 
-	for (int i = 0; i < vectfaces.size(); ++i) {
+	for (int i = 0; i < n_faces; ++i) {
 		bool good_face = True;
 		for (int j = 0; j < vectfaces[i].size(); ++j) {
 			if (!good_vertexes[std::abs(vectfaces[i][j])]) {
@@ -507,21 +417,17 @@ void Voronoi::parse_output3d(std::stringstream &output, const double &min_x, con
 			stringStream << "3 " << vectfaces[i].size();
 			for (int j = 0; j < vectfaces[i].size(); ++j) {
 				cur_face.append(vectfaces[i][j]);
-
-				for (int n = 0; n < 3; ++n) {
-					stringStream << ' ' << voro_vertexes[vectfaces[i][j]][n];
-				}
+				stringStream << "\n" << voro_vertexes[vectfaces[i][j]][0];
+				stringStream << " " << voro_vertexes[vectfaces[i][j]][1];
+				stringStream << " " << voro_vertexes[vectfaces[i][j]][2];
 			}
+			stringStream << "\n";
 			faces.append(cur_face);
 
 			std::istringstream iStringStream = std::istringstream(stringStream.str());
 			rbox.appendPoints(iStringStream);
-			std::ofstream myfile;
-			myfile.open("output_qhull.txt");
-			myfile << iStringStream.rdbuf();
-			myfile.close();
-			
-			qhull.runQhull(rbox, "i Qt");
+
+			qhull.runQhull(rbox, "i Qt QJ Pp"); // we need QJ to make sure that planar points can be calculated
 			qhull.outputQhull();
 
 			Array godot_triangles = Array();
@@ -533,13 +439,13 @@ void Voronoi::parse_output3d(std::stringstream &output, const double &min_x, con
 				} else {
 					std::string::size_type offset = 0;
 					std::string::size_type pos = 0;
-					pos = line.find(' ');	
+					pos = line.find(' ');
 					int a = atoi(line.substr(offset, pos).c_str());
 					offset += pos + 1;
-					pos = line.substr(offset).find(' ');	
+					pos = line.substr(offset).find(' ');
 					int b = atoi(line.substr(offset, pos).c_str());
 					offset += pos + 1;
-					pos = line.substr(offset).find(' ');	
+					pos = line.substr(offset).find(' ');
 					int c = atoi(line.substr(offset, pos).c_str());
 
 					Array p = Array();
