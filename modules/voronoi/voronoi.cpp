@@ -123,7 +123,7 @@ void Voronoi::voronoi_in_box(Array bounding_points, int n_points, int n_dim) {
 		}
 	}
 
-	std::stringstream stringStream;
+	std::ostringstream stringStream;
 
 	stringStream << n_dim << " " << (2 * n_dim + 1) * n_points;
 	for (size_t i = 0; i < all_points.size(); i += n_dim) {
@@ -134,6 +134,7 @@ void Voronoi::voronoi_in_box(Array bounding_points, int n_points, int n_dim) {
 		}
 	}
 	orgQhull::RboxPoints rbox;
+	
 	std::istringstream iStringStream(stringStream.str());
 	rbox.appendPoints(std::istringstream(stringStream.str()));
 	
@@ -281,9 +282,19 @@ void Voronoi::parse_output3d(std::stringstream &output, const double &min_x, con
 
 		} else if (line_counter > 1 && line_counter < n_points + 2) {
 			pos = line.find(" ");
-			int offset = 0;
+
+			// sometimes there are trailing spaces in the QHull output which we need to skip
+			if (pos == 0) {
+				pos = 1;
+				while (line.substr(pos, 1) == " ") {
+					pos += 1;
+				}
+				line = line.substr(pos);
+				pos = line.find(" ");
+			}
+
 			double x = atof(line.substr(0, pos).c_str());
-			offset += pos + 1;
+			int offset = pos + 1;
 			pos = line.substr(offset).find(" ");
 			double y = atof(line.substr(offset, pos).c_str());
 			offset += pos + 1;

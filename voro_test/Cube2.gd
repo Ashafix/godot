@@ -1,11 +1,9 @@
 extends KinematicBody
 
-var shattered = false
-
 func _ready():
 	
 	var voro = Voronoi.new()
-	voro.voronoi3d(10)
+	voro.voronoi3d(100)
 	var vertexes = voro.get_vertexes()
 	var fragments = voro.get_fragments()
 	var faces = voro.get_faces()
@@ -68,42 +66,33 @@ func _ready():
 	self.add_child(new_node)
 	var packed_scene = PackedScene.new()
 	packed_scene.pack(new_node)
-	ResourceSaver.save("res://voronoi.tscn", packed_scene)
+	ResourceSaver.save("res://voronoi_explosion.tscn", packed_scene)
 
 
 func _physics_process(delta):
-	if shattered:
-		return
-	var move = move_and_collide(Vector3(0, -0.1, 0))
-
-	if move:
-		shattered = true
+	
 		
-		var new_node = get_node('FragmentNode')
-		new_node.transform.translated(self.transform.origin)
-		get_node('CollisionShape').disabled = true
-		for body in new_node.get_children():
-			body.get_node('CollisionShape').disabled = false
-			body.visible = true
-			body.sleeping = false
+	var new_node = get_node('FragmentNode')
+	new_node.transform.translated(self.transform.origin)
+	get_node('CollisionShape').disabled = true
+	for body in new_node.get_children():
+		body.get_node('CollisionShape').disabled = false
+		body.visible = true
+		body.sleeping = false
 			
-		get_node('MeshInstance').hide()
-
+	get_node('MeshInstance').hide()
+	
 func _input(event):
-	if event.is_action('ui_select') and shattered:
-		print('starting again')
-		shattered = false
+	if event.is_action('ui_select'):
+		
+		
 		var new_node = get_node('FragmentNode')
 		if new_node:
 			new_node.free()
-		var voro_cube = load('res://voronoi.tscn')
+		var voro_cube = load('res://voronoi_explosion.tscn')
 		
 		voro_cube = voro_cube.instance()
 		add_child(voro_cube)
-		self.translate(Vector3(0, 12, 0))
+		self.translate(Vector3(0, 0, 3))
 		get_node('MeshInstance').show()
 		get_node('CollisionShape').disabled = false;
-		
-	
-	
-	
